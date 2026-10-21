@@ -137,22 +137,19 @@ export const InstructionsPage = () => {
         </div>
 
         {/* Anti-Cheating & Integrity Notice */}
-        <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-500/30 space-y-2 text-xs text-slate-300">
-          <h3 className="font-bold text-rose-300 uppercase tracking-wider text-xs flex items-center gap-2">
+        <div className="p-4 rounded-2xl bg-rose-950/30 border border-rose-500/40 space-y-2.5 text-xs text-rose-200">
+          <h3 className="font-bold text-rose-400 uppercase tracking-wider text-xs flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-rose-400" />
-            <span>Browser-Based Integrity Deterrence</span>
+            <span>Strict Zero Tolerance Integrity Policy & Automatic Kick-Out</span>
           </h3>
           <p className="leading-relaxed">
-            1. <strong>Fullscreen Required:</strong> You will be placed in fullscreen mode upon starting. Exiting fullscreen is recorded as a violation.
+            1. <strong>Immediate Kick-Out & 0 Marks:</strong> Any attempt to switch browser tabs, leave or minimize the exam window, or exit fullscreen will <strong>IMMEDIATELY terminate your examination session, disqualify you, and set your score to 0</strong>.
           </p>
           <p className="leading-relaxed">
-            2. <strong>Tab & Window Tracking:</strong> Switching browser tabs or minimizing the examination window triggers an on-screen warning and logs an activity event.
+            2. <strong>Automatic Submission on Time End:</strong> When the duration countdown expires, the test automatically finalizes and submits your current responses.
           </p>
           <p className="leading-relaxed">
-            3. <strong>Automatic Submissions:</strong> If you exceed the maximum permitted integrity warnings ({test?.integrityPolicy?.warningLimit || 3}), your test will be flagged or automatically submitted.
-          </p>
-          <p className="leading-relaxed">
-            4. <strong>Autosave:</strong> All MCQ choices and code entries are autosaved periodically and upon navigating questions.
+            3. <strong>Autosave:</strong> All answers and code entries are autosaved in real-time.
           </p>
         </div>
 

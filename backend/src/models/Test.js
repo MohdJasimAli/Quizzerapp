@@ -25,8 +25,8 @@ const testSchema = new mongoose.Schema(
     duration: {
       type: Number,
       required: [true, 'Duration in minutes is required'],
-      min: [5, 'Duration must be at least 5 minutes'],
-      max: [300, 'Duration cannot exceed 300 minutes'],
+      min: [1, 'Duration must be at least 1 minute'],
+      max: [60, 'Duration cannot exceed 60 minutes (1 hour)'],
     },
     startTime: {
       type: Date,

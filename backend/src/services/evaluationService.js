@@ -19,6 +19,7 @@ const evaluateAttempt = async (attemptId, evaluatedByUserId = null) => {
   }
 
   const questions = test.questions;
+  const isDisqualified = attempt.status === 'disqualified';
   let totalMarksObtained = 0;
   let maxMarks = 0;
   let mcqScore = 0;
@@ -27,6 +28,19 @@ const evaluateAttempt = async (attemptId, evaluatedByUserId = null) => {
 
   for (const q of questions) {
     maxMarks += q.marks;
+
+    if (isDisqualified) {
+      questionEvaluations.push({
+        questionId: q._id,
+        questionType: q.type,
+        questionTitle: q.title,
+        allocatedMarks: q.marks,
+        marksAwarded: 0,
+        isEvaluated: true,
+        teacherFeedback: 'Disqualified: 0 marks awarded due to integrity policy violation.',
+      });
+      continue;
+    }
 
     if (q.type === 'mcq') {
       // Find student answer
@@ -144,12 +158,14 @@ const evaluateAttempt = async (attemptId, evaluatedByUserId = null) => {
       totalMarksObtained,
       maxMarks,
       percentage,
-      isPassed,
+      isPassed: isDisqualified ? false : isPassed,
       mcqScore: Math.max(0, Number(mcqScore.toFixed(2))),
       codingScore: Math.max(0, Number(codingScore.toFixed(2))),
       questionEvaluations,
-      isReleased: shouldRelease,
-      releasedAt: shouldRelease ? new Date() : null,
+      isDisqualified,
+      disqualificationReason: attempt.disqualificationReason || (isDisqualified ? 'Exam integrity violation' : ''),
+      isReleased: isDisqualified ? true : shouldRelease,
+      releasedAt: (isDisqualified || shouldRelease) ? new Date() : null,
       evaluatedAt: new Date(),
       evaluatedBy: evaluatedByUserId,
     },

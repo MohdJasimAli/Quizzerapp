@@ -122,21 +122,36 @@ export const TestTakingPage = () => {
         if (res.success) {
           setViolationCount(res.violationCount);
           setLastViolationType(eventType);
-          setIntegrityModalOpen(true);
 
+          if (res.disqualified) {
+            setIsAutoSubmitted(true);
+            toast.error('Violation detected! You have been immediately disqualified and kicked out with 0 marks.');
+            navigate(`/tests/${testId}/submitted`, {
+              state: {
+                isDisqualified: true,
+                reason: details || eventType,
+                message: res.message,
+                result: res.result,
+                testTitle: test?.title,
+              },
+            });
+            return;
+          }
+
+          setIntegrityModalOpen(true);
           if (res.autoSubmitted) {
             setIsAutoSubmitted(true);
             toast.error('Integrity violation limit exceeded. Test automatically submitted.');
             setTimeout(() => {
               navigate(`/tests/${testId}/submitted`, { state: { autoSubmitted: true } });
-            }, 3000);
+            }, 2000);
           }
         }
       } catch (err) {
         console.error('Integrity report error:', err);
       }
     },
-    [attempt, isAutoSubmitted, isSubmitting, testId, navigate, toast]
+    [attempt, isAutoSubmitted, isSubmitting, testId, test, navigate, toast]
   );
 
   useEffect(() => {
@@ -408,7 +423,10 @@ export const TestTakingPage = () => {
             {attempt?.deadline && (
               <Timer
                 deadline={attempt.deadline}
-                onExpire={() => handleFinalSubmit(true, 'timer_expired')}
+                onExpire={() => {
+                  toast.warning('Examination time expired! Auto-submitting all answers...');
+                  handleFinalSubmit(true, 'timer_expired');
+                }}
               />
             )}
 

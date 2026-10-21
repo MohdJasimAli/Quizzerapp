@@ -272,20 +272,38 @@ export const TestBuilder = () => {
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
+              <div className="sm:col-span-1">
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Duration (Minutes) <span className="text-rose-400">*</span>
+                  Duration (Minutes: 1 min to 1 hr) <span className="text-rose-400">*</span>
                 </label>
                 <input
                   type="number"
                   name="duration"
                   value={formData.duration}
                   onChange={handleChange}
-                  min={5}
-                  max={300}
+                  min={1}
+                  max={60}
                   required
+                  placeholder="1 - 60"
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl py-2 px-3.5 text-sm text-white focus:outline-none focus:border-indigo-500"
                 />
+                {/* Preset Duration Buttons */}
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {[1, 5, 15, 30, 45, 60].map((mins) => (
+                    <button
+                      key={mins}
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, duration: mins }))}
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition ${
+                        Number(formData.duration) === mins
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-slate-800 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {mins === 60 ? '1 hr' : `${mins}m`}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>
@@ -320,10 +338,19 @@ export const TestBuilder = () => {
 
           {/* Section 3: Assessment Behavior & Integrity */}
           <div className="space-y-4 pt-4 border-t border-slate-800">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-400 border-b border-slate-800 pb-2 flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4" />
-              <span>Evaluation Rules & Integrity Policy</span>
-            </h3>
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4" />
+                <span>Evaluation Rules & Integrity Policy</span>
+              </h3>
+              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                Immediate Kick-Out Active
+              </span>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-rose-950/20 border border-rose-500/30 text-xs text-rose-200">
+              <strong>Strict Zero Tolerance Policy Enforced:</strong> If a student commits any integrity violation (tab switch, window minimization, or exiting fullscreen), the test will immediately kick them out, disqualify the attempt, and record <strong>0 marks</strong>. When the duration timer expires, the test automatically submits.
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900 border border-slate-800">

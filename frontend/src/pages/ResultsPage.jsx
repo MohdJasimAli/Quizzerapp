@@ -163,12 +163,14 @@ export const ResultsPage = () => {
             <div>
               <span
                 className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                  result.isPassed
+                  result.isDisqualified
+                    ? 'bg-rose-500/30 text-rose-300 border border-rose-500/50'
+                    : result.isPassed
                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                     : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
                 }`}
               >
-                {result.isPassed ? 'PASSED ASSESSMENT' : 'NEEDS IMPROVEMENT'}
+                {result.isDisqualified ? 'DISQUALIFIED (0 MARKS)' : result.isPassed ? 'PASSED ASSESSMENT' : 'NEEDS IMPROVEMENT'}
               </span>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white mt-2">
                 Official Examination Scorecard
@@ -176,6 +178,12 @@ export const ResultsPage = () => {
               <p className="text-xs text-slate-400 mt-1">
                 Student: <strong className="text-slate-200">{result.studentId?.name || user?.name}</strong> &bull; Roll: {result.studentId?.rollNumber || user?.rollNumber}
               </p>
+              {result.isDisqualified && (
+                <div className="mt-3 p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-200 text-xs">
+                  <strong>Disqualified for Integrity Violation: </strong>
+                  <span>{result.disqualificationReason || 'Leaving examination screen / tab switch'}</span>
+                </div>
+              )}
             </div>
 
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 px-6 text-center w-full sm:w-auto">
@@ -407,12 +415,14 @@ export const ResultsPage = () => {
                     <td className="py-3 px-4">
                       <span
                         className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                          r.isPassed
+                          r.isDisqualified || r.attemptId?.status === 'disqualified'
+                            ? 'bg-rose-950/80 text-rose-300 border border-rose-500/50'
+                            : r.isPassed
                             ? 'bg-emerald-500/20 text-emerald-300'
                             : 'bg-rose-500/20 text-rose-300'
                         }`}
                       >
-                        {r.isPassed ? 'Passed' : 'Failed'}
+                        {r.isDisqualified || r.attemptId?.status === 'disqualified' ? 'Disqualified (0)' : r.isPassed ? 'Passed' : 'Failed'}
                       </span>
                     </td>
                     <td className="py-3 px-4 font-mono">

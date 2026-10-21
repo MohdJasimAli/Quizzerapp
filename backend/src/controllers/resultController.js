@@ -28,6 +28,15 @@ const getAttemptResult = async (req, res) => {
         return res.status(403).json({ success: false, message: 'Access denied.' });
       }
 
+      if (result.isDisqualified) {
+        return res.status(200).json({
+          success: true,
+          isReleased: true,
+          isDisqualified: true,
+          result: result.toStudentView(true),
+        });
+      }
+
       const isReleased = test.isResultsReleased || test.releaseResultsMode === 'immediate' || result.isReleased;
 
       if (!isReleased) {

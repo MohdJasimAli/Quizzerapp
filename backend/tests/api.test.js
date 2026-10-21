@@ -201,3 +201,94 @@ if lines:
   assert.strictEqual(evalResult.results[0].passed, true);
   assert.strictEqual(evalResult.results[1].passed, true);
 });
+
+test('Rule 7: Teacher can set test duration from 1 min to 60 mins', async () => {
+  const admin = await User.findOne({ role: 'admin' });
+  
+  // Valid 1 minute test
+  const oneMinTest = new TestModel({
+    title: '1 Minute Speed Sprint',
+    subject: 'Algorithms',
+    duration: 1,
+    startTime: new Date(),
+    endTime: new Date(Date.now() + 86400000),
+    testType: 'mcq',
+    createdBy: admin._id,
+  });
+  const err1 = oneMinTest.validateSync();
+  assert.strictEqual(err1, undefined, '1 minute duration should be valid');
+
+  // Valid 60 minute test
+  const hourTest = new TestModel({
+    title: '1 Hour Comprehensive Exam',
+    subject: 'Algorithms',
+    duration: 60,
+    startTime: new Date(),
+    endTime: new Date(Date.now() + 86400000),
+    testType: 'mcq',
+    createdBy: admin._id,
+  });
+  const err60 = hourTest.validateSync();
+  assert.strictEqual(err60, undefined, '60 minutes duration should be valid');
+
+  // Invalid 0 min test
+  const zeroMinTest = new TestModel({
+    title: 'Zero Min Test',
+    subject: 'Algorithms',
+    duration: 0,
+    startTime: new Date(),
+    endTime: new Date(Date.now() + 86400000),
+    testType: 'mcq',
+    createdBy: admin._id,
+  });
+  const errZero = zeroMinTest.validateSync();
+  assert.notStrictEqual(errZero, undefined, '0 minute duration should fail validation');
+
+  // Invalid 61 min test
+  const excessTest = new TestModel({
+    title: 'Excess Min Test',
+    subject: 'Algorithms',
+    duration: 61,
+    startTime: new Date(),
+    endTime: new Date(Date.now() + 86400000),
+    testType: 'mcq',
+    createdBy: admin._id,
+  });
+  const errExcess = excessTest.validateSync();
+  assert.notStrictEqual(errExcess, undefined, 'Over 60 minutes should fail validation');
+});
+
+test('Rule 8: Any integrity violation causes immediate disqualification with 0 marks', async () => {
+  const admin = await User.findOne({ role: 'admin' });
+  const student = await User.findOne({ role: 'student' });
+  const testObj = await TestModel.findOne({ isPublished: true }).populate('questions');
+  assert.ok(testObj, 'Published test should exist');
+
+  const TestAttempt = require('../src/models/TestAttempt');
+  const { evaluateAttempt } = require('../src/services/evaluationService');
+
+  const attempt = await TestAttempt.create({
+    testId: testObj._id,
+    studentId: student._id,
+    attemptNumber: 99,
+    startTime: new Date(),
+    deadline: new Date(Date.now() + 30 * 60 * 1000),
+    status: 'disqualified',
+    isDisqualified: true,
+    disqualificationReason: 'Tab switch detected: Immediate Kick-out policy',
+    submittedAt: new Date(),
+    submissionReason: 'disqualification',
+    submittedBySystem: true,
+  });
+
+  const evalResult = await evaluateAttempt(attempt._id);
+  assert.strictEqual(evalResult.totalMarksObtained, 0, 'Marks obtained must be 0 for disqualified attempt');
+  assert.strictEqual(evalResult.percentage, 0, 'Percentage must be 0 for disqualified attempt');
+  assert.strictEqual(evalResult.isPassed, false, 'Student must fail when disqualified');
+  assert.strictEqual(evalResult.isDisqualified, true, 'isDisqualified flag must be true');
+
+  // Clean up
+  await TestAttempt.findByIdAndDelete(attempt._id);
+  const ResultModel = require('../src/models/Result');
+  await ResultModel.findOneAndDelete({ attemptId: attempt._id });
+});

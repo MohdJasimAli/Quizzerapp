@@ -36,6 +36,14 @@ const createTest = async (req, res) => {
       });
     }
 
+    const durationNum = Number(duration);
+    if (isNaN(durationNum) || durationNum < 1 || durationNum > 60) {
+      return res.status(400).json({
+        success: false,
+        message: 'Test duration must be between 1 minute and 60 minutes (1 hour).',
+      });
+    }
+
     if (new Date(endTime) <= new Date(startTime)) {
       return res.status(400).json({
         success: false,
@@ -246,6 +254,17 @@ const updateTest = async (req, res) => {
     const updates = req.body;
     delete updates.questions; // Questions managed through questionController
     delete updates.isPublished; // Published through publish endpoint
+
+    if (updates.duration !== undefined) {
+      const dur = Number(updates.duration);
+      if (isNaN(dur) || dur < 1 || dur > 60) {
+        return res.status(400).json({
+          success: false,
+          message: 'Test duration must be between 1 minute and 60 minutes (1 hour).',
+        });
+      }
+      updates.duration = dur;
+    }
 
     Object.assign(test, updates);
     await test.save();

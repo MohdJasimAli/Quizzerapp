@@ -123,8 +123,16 @@ const testAttemptSchema = new mongoose.Schema(
     },
     submissionReason: {
       type: String,
-      enum: ['manual_submit', 'timer_expired', 'violation_limit_exceeded'],
+      enum: ['manual_submit', 'timer_expired', 'violation_limit_exceeded', 'disqualification'],
       default: 'manual_submit',
+    },
+    isDisqualified: {
+      type: Boolean,
+      default: false,
+    },
+    disqualificationReason: {
+      type: String,
+      default: '',
     },
   },
   {

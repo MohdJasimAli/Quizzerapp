@@ -127,6 +127,15 @@ const resultSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
+    isDisqualified: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    disqualificationReason: {
+      type: String,
+      default: '',
+    },
     releasedAt: {
       type: Date,
     },
@@ -147,6 +156,26 @@ const resultSchema = new mongoose.Schema(
 // Method to safe-strip results for student if not yet released
 resultSchema.methods.toStudentView = function (isReleased) {
   const obj = this.toObject();
+
+  if (obj.isDisqualified) {
+    return {
+      _id: obj._id,
+      attemptId: obj.attemptId,
+      testId: obj.testId,
+      studentId: obj.studentId,
+      isReleased: true,
+      isDisqualified: true,
+      disqualificationReason: obj.disqualificationReason || 'Integrity violation detected',
+      totalMarksObtained: 0,
+      maxMarks: obj.maxMarks,
+      percentage: 0,
+      isPassed: false,
+      mcqScore: 0,
+      codingScore: 0,
+      message: 'DISQUALIFIED: You were disqualified due to an integrity violation. Your marks are 0.',
+    };
+  }
+
   if (!isReleased) {
     // Only return minimal completion info, no answers or question breakdown
     return {

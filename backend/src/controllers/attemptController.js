@@ -39,6 +39,21 @@ const startTest = async (req, res) => {
       });
     }
 
+    // Check if student was previously disqualified from this test
+    const disqualifiedAttempt = await TestAttempt.findOne({
+      testId,
+      studentId,
+      status: 'disqualified',
+    });
+
+    if (disqualifiedAttempt) {
+      return res.status(403).json({
+        success: false,
+        isDisqualified: true,
+        message: 'You have been disqualified from this assessment due to an integrity violation. Your marks are 0 and you cannot re-attempt.',
+      });
+    }
+
     // Check existing attempt
     let attempt = await TestAttempt.findOne({
       testId,
@@ -351,9 +366,6 @@ const logIntegrityEvent = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Associated test not found.' });
     }
 
-    const violationLimit = test.integrityPolicy?.warningLimit || 3;
-    const actionOnLimit = test.integrityPolicy?.actionOnLimit || 'flag_for_review';
-
     attempt.integrityEvents.push({
       eventType,
       details: details || '',
@@ -362,67 +374,45 @@ const logIntegrityEvent = async (req, res) => {
 
     attempt.violationCount += 1;
 
-    // Save to centralized ActivityLog
+    // IMMEDIATE DISQUALIFICATION POLICY:
+    // Any violation kicks student out of test immediately and sets marks to 0
+    attempt.status = 'disqualified';
+    attempt.isDisqualified = true;
+    attempt.disqualificationReason = details || `Integrity violation: ${eventType.replace(/_/g, ' ')}`;
+    attempt.submittedAt = new Date();
+    attempt.submissionReason = 'disqualification';
+    attempt.submittedBySystem = true;
+    attempt.isFlaggedForReview = true;
+
+    await attempt.save();
+
+    // Save to centralized ActivityLog as Critical
     await ActivityLog.create({
       testId: test._id,
       studentId: req.user._id,
       attemptId: attempt._id,
-      eventType,
-      severity: attempt.violationCount >= violationLimit ? 'critical' : 'warning',
+      eventType: 'auto_submitted_violation',
+      severity: 'critical',
       details: {
         violationCount: attempt.violationCount,
-        details,
-        limit: violationLimit,
+        disqualification: true,
+        reason: attempt.disqualificationReason,
       },
       ipAddress: req.ip || req.connection.remoteAddress,
       userAgent: req.headers['user-agent'],
     });
 
-    // Check if violation limit exceeded
-    let autoSubmitted = false;
-    if (attempt.violationCount >= violationLimit) {
-      if (actionOnLimit === 'auto_submit') {
-        attempt.status = 'submitted';
-        attempt.submittedAt = new Date();
-        attempt.submissionReason = 'violation_limit_exceeded';
-        attempt.submittedBySystem = true;
-        attempt.isFlaggedForReview = true;
-        await attempt.save();
-
-        await ActivityLog.create({
-          testId: test._id,
-          studentId: req.user._id,
-          attemptId: attempt._id,
-          eventType: 'auto_submitted_violation',
-          severity: 'critical',
-          details: { violationCount: attempt.violationCount, limit: violationLimit },
-        });
-
-        await evaluateAttempt(attempt._id);
-        autoSubmitted = true;
-
-        return res.status(200).json({
-          success: true,
-          autoSubmitted: true,
-          violationCount: attempt.violationCount,
-          warningsRemaining: 0,
-          message: 'Integrity policy violation limit exceeded. Test has been automatically submitted.',
-        });
-      } else {
-        attempt.isFlaggedForReview = true;
-      }
-    }
-
-    await attempt.save();
-
-    const warningsRemaining = Math.max(0, violationLimit - attempt.violationCount);
+    // Evaluate attempt - sets 0 marks across all questions!
+    const result = await evaluateAttempt(attempt._id);
 
     return res.status(200).json({
       success: true,
-      autoSubmitted: false,
+      disqualified: true,
+      autoSubmitted: true,
       violationCount: attempt.violationCount,
-      warningsRemaining,
-      message: `Integrity warning recorded. Warnings remaining: ${warningsRemaining}`,
+      message: 'Violation detected: You have been immediately disqualified from this test and your marks have been set to 0.',
+      reason: attempt.disqualificationReason,
+      result: result.toStudentView ? result.toStudentView(true) : null,
     });
   } catch (error) {
     return res.status(500).json({
