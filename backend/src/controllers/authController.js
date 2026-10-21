@@ -100,11 +100,15 @@ const register = async (req, res) => {
       });
     }
 
-    // Default to student if not specified; only admin can create admin/teacher accounts directly
-    let assignedRole = 'student';
-    if (role && ['teacher', 'student'].includes(role)) {
-      assignedRole = role;
+    if (role && (role === 'teacher' || role === 'admin')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Faculty and teacher accounts cannot be self-registered. An Administrator must create your teacher account and share your credentials with you.',
+      });
     }
+
+    // Public registration is strictly for students
+    const assignedRole = 'student';
 
     const user = await User.create({
       name,

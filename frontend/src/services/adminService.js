@@ -25,6 +25,11 @@ export const deleteUser = async (id) => {
   return res.data;
 };
 
+export const resetUserPassword = async (id, newPassword) => {
+  const res = await api.post(`/admin/users/${id}/reset-password`, { newPassword });
+  return res.data;
+};
+
 export const getActivityLogs = async (params) => {
   const res = await api.get('/admin/activity-logs', { params });
   return res.data;

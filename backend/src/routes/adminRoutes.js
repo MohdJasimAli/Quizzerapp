@@ -6,6 +6,7 @@ const {
   createUser,
   updateUser,
   deleteUser,
+  resetUserPassword,
   getActivityLogs,
 } = require('../controllers/adminController');
 const { verifyToken } = require('../middleware/auth');
@@ -21,6 +22,7 @@ router.get('/activity-logs', requireRole(['admin', 'teacher']), getActivityLogs)
 router.get('/stats', requireRole('admin'), getDashboardStats);
 router.post('/users', requireRole('admin'), createUser);
 router.put('/users/:id', requireRole('admin'), updateUser);
+router.post('/users/:id/reset-password', requireRole('admin'), resetUserPassword);
 router.delete('/users/:id', requireRole('admin'), deleteUser);
 
 module.exports = router;

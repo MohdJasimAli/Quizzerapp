@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import {
@@ -140,6 +140,19 @@ export const Login = () => {
               )}
             </button>
           </form>
+
+          {/* Student Registration Link */}
+          <div className="mt-5 pt-4 border-t border-slate-800 text-center">
+            <p className="text-xs text-slate-400">
+              New Student?{' '}
+              <Link to="/register" className="text-indigo-400 hover:text-indigo-300 font-semibold transition">
+                Create a student account &rarr;
+              </Link>
+            </p>
+            <p className="text-[11px] text-slate-500 mt-1">
+              Faculty / Teacher accounts are issued directly by the Administrator.
+            </p>
+          </div>
 
           {/* Quick Demo Logins for Pair Programming / Evaluation */}
           <div className="mt-6 pt-5 border-t border-slate-800">

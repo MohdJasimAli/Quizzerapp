@@ -10,6 +10,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 
 // Pages
 import { Login } from './pages/Login';
+import { Register } from './pages/Register';
 import { StudentDashboard } from './pages/StudentDashboard';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { TeacherDashboard } from './pages/TeacherDashboard';
@@ -50,6 +51,7 @@ export const App = () => {
                 {/* Public */}
                 <Route path="/" element={<HomeRedirect />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
 
                 {/* Student Routes */}
                 <Route

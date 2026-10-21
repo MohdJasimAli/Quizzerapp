@@ -142,6 +142,13 @@ const createUser = async (req, res) => {
       success: true,
       message: `${role.charAt(0).toUpperCase() + role.slice(1)} account created successfully.`,
       user,
+      createdCredentials: {
+        name: user.name,
+        email: user.email,
+        password, // Provided plain text password for sharing with the teacher
+        role: user.role,
+        department: user.department,
+      },
     });
   } catch (error) {
     return res.status(500).json({
@@ -255,11 +262,49 @@ const getActivityLogs = async (req, res) => {
   }
 };
 
+// @desc    Admin resets password and returns shareable credentials
+// @route   POST /api/admin/users/:id/reset-password
+// @access  Admin
+const resetUserPassword = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { newPassword } = req.body;
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const tempPassword = newPassword || `Kairos@${Math.floor(100000 + Math.random() * 900000)}`;
+    user.password = tempPassword;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Password updated for ${user.name}.`,
+      credentials: {
+        name: user.name,
+        email: user.email,
+        password: tempPassword,
+        role: user.role,
+        department: user.department,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to reset password.',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getDashboardStats,
   getUsers,
   createUser,
   updateUser,
   deleteUser,
+  resetUserPassword,
   getActivityLogs,
 };

@@ -114,12 +114,20 @@ export const Navbar = () => {
                 </button>
               </div>
             ) : (
-              <Link
-                to="/login"
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg shadow-md shadow-indigo-600/20 transition"
-              >
-                Sign In
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/register"
+                  className="px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg transition"
+                >
+                  Student Register
+                </Link>
+                <Link
+                  to="/login"
+                  className="px-4 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg shadow-md shadow-indigo-600/20 transition"
+                >
+                  Sign In
+                </Link>
+              </div>
             )}
           </div>
 

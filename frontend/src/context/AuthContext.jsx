@@ -48,6 +48,21 @@ export const AuthProvider = ({ children }) => {
     throw new Error(res.data.message || 'Login failed');
   };
 
+  const register = async (studentData) => {
+    // Only student self-registration is allowed through public portal
+    const res = await api.post('/auth/register', {
+      ...studentData,
+      role: 'student',
+    });
+    if (res.data.success) {
+      localStorage.setItem('kairos_token', res.data.token);
+      localStorage.setItem('kairos_user', JSON.stringify(res.data.user));
+      setUser(res.data.user);
+      return res.data;
+    }
+    throw new Error(res.data.message || 'Registration failed');
+  };
+
   const logout = () => {
     localStorage.removeItem('kairos_token');
     localStorage.removeItem('kairos_user');
@@ -67,6 +82,7 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     login,
+    register,
     logout,
     updateUserProfile,
     isAuthenticated: !!user,
