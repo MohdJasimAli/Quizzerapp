@@ -35,6 +35,7 @@ const activityLogSchema = new mongoose.Schema(
         'camera_disconnected',
         'retina_tracking_started',
         'retina_gaze_violation',
+        'head_movement_violation',
         'face_not_detected',
         'multiple_faces_detected',
         'code_run',

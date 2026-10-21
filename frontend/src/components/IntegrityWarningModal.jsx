@@ -16,6 +16,7 @@ export const IntegrityWarningModal = ({
     fullscreen_exit: 'Fullscreen mode was exited. Fullscreen is mandatory during the assessment.',
     window_blur: 'Window lost active focus. Another application or browser window may have been accessed.',
     retina_gaze_violation: 'Retina eye-gaze tracking detected you were looking away from the screen for over 3 seconds.',
+    head_movement_violation: 'Excessive head movement detected. Turning your head away from the screen is prohibited.',
     face_not_detected: 'Your face was not detected in the camera feed for over 3 seconds.',
     multiple_faces_detected: 'Multiple faces were detected in the examination camera view.',
     camera_disconnected: 'Webcam feed was disconnected or turned off during the examination.',
