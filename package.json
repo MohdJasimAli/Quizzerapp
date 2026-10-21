@@ -1,0 +1,24 @@
+{
+  "name": "kairos-club-online-test-platform",
+  "version": "1.0.0",
+  "description": "KAIROS TEST - Online Examination & Coding Assessment Platform for Kairos Club",
+  "scripts": {
+    "install:backend": "cd backend && npm install",
+    "install:frontend": "cd frontend && npm install",
+    "install:all": "npm run install:backend && npm run install:frontend",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "seed": "cd backend && npm run seed",
+    "test": "cd backend && npm test"
+  },
+  "keywords": [
+    "kairos",
+    "exam-platform",
+    "coding-assessment",
+    "mcq",
+    "judge0",
+    "monaco-editor"
+  ],
+  "author": "Kairos Club",
+  "license": "ISC"
+}
