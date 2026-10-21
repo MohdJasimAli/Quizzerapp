@@ -318,7 +318,7 @@ export const StudentDashboard = () => {
                 <div className="space-y-4">
                   {completedAttemptsList.map((att) => {
                     const test = att.testId;
-                    const isResultsReleased = test?.isResultsReleased;
+                    const res = att.result;
 
                     return (
                       <div
@@ -327,8 +327,16 @@ export const StudentDashboard = () => {
                       >
                         <div>
                           <div className="flex items-center gap-2 mb-1.5">
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                              Submitted
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                res?.isDisqualified || att.status === 'disqualified'
+                                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                  : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              }`}
+                            >
+                              {res?.isDisqualified || att.status === 'disqualified'
+                                ? 'Disqualified (0)'
+                                : 'Completed'}
                             </span>
                             <span className="text-xs text-slate-400">
                               on {new Date(att.submittedAt || att.updatedAt).toLocaleString()}
@@ -339,14 +347,31 @@ export const StudentDashboard = () => {
                           <p className="text-xs text-slate-400 mt-0.5">
                             {test?.subject} &bull; Total Marks: {test?.totalMarks}
                           </p>
+
+                          {res && (
+                            <div className="flex items-center gap-3 mt-2 text-xs">
+                              <span className="font-mono font-bold text-indigo-400">
+                                Score: {res.totalMarksObtained} / {res.maxMarks} ({res.percentage}%)
+                              </span>
+                              <span
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
+                                  res.isPassed
+                                    ? 'bg-emerald-500/20 text-emerald-300'
+                                    : 'bg-rose-500/20 text-rose-300'
+                                }`}
+                              >
+                                {res.isPassed ? 'PASSED' : 'FAILED'}
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-3 w-full md:w-auto justify-end">
                           <Link
                             to={`/results/${att._id}`}
-                            className="w-full md:w-auto py-2.5 px-5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs flex items-center justify-center gap-2 transition border border-slate-700"
+                            className="w-full md:w-auto py-2.5 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center justify-center gap-2 transition shadow-md shadow-indigo-600/20"
                           >
-                            <span>{isResultsReleased ? 'View Detailed Scorecard' : 'View Submission Status'}</span>
+                            <span>View Full Scorecard</span>
                             <ArrowRight className="w-3.5 h-3.5" />
                           </Link>
                         </div>

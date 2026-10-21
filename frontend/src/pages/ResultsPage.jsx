@@ -120,24 +120,20 @@ export const ResultsPage = () => {
 
   // VIEW 1: SINGLE ATTEMPT RESULT (Student or Individual Inspector)
   if (attemptId) {
-    const isReleased = data?.isReleased;
     const result = data?.result;
 
-    if (!isReleased) {
+    if (!result) {
       return (
         <div className="max-w-2xl mx-auto px-4 py-16 text-center">
           <div className="glass-panel p-8 rounded-3xl border border-slate-800 space-y-4">
-            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mx-auto">
-              <Clock className="w-8 h-8" />
-            </div>
-            <h2 className="text-2xl font-bold text-white">Results Pending Publication</h2>
-            <p className="text-sm text-slate-300 leading-relaxed max-w-md mx-auto">
-              Your test has been received and evaluated on the server. The instructor has configured results for manual release. You will be able to review your score and detailed answers as soon as results are officially released.
+            <h2 className="text-xl font-bold text-white">Scorecard Not Found</h2>
+            <p className="text-xs text-slate-400">
+              The evaluation for this attempt could not be located.
             </p>
-            <div className="pt-4">
+            <div className="pt-2">
               <Link
                 to="/student/dashboard"
-                className="py-2.5 px-6 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold"
+                className="py-2 px-5 rounded-xl bg-slate-800 text-slate-200 text-xs font-semibold"
               >
                 Return to Dashboard
               </Link>

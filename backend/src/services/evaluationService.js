@@ -146,7 +146,8 @@ const evaluateAttempt = async (attemptId, evaluatedByUserId = null) => {
   const percentage = maxMarks > 0 ? Number(((totalMarksObtained / maxMarks) * 100).toFixed(2)) : 0;
   const isPassed = percentage >= 40; // 40% passing standard
 
-  const shouldRelease = test.releaseResultsMode === 'immediate' || test.isResultsReleased;
+  // Results are released immediately so students can see their score right after test submission
+  const shouldRelease = true;
 
   // Upsert result
   const result = await Result.findOneAndUpdate(
@@ -164,8 +165,8 @@ const evaluateAttempt = async (attemptId, evaluatedByUserId = null) => {
       questionEvaluations,
       isDisqualified,
       disqualificationReason: attempt.disqualificationReason || (isDisqualified ? 'Exam integrity violation' : ''),
-      isReleased: isDisqualified ? true : shouldRelease,
-      releasedAt: (isDisqualified || shouldRelease) ? new Date() : null,
+      isReleased: true,
+      releasedAt: new Date(),
       evaluatedAt: new Date(),
       evaluatedBy: evaluatedByUserId,
     },

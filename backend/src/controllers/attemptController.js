@@ -494,18 +494,40 @@ const submitTest = async (req, res) => {
   }
 };
 
-// @desc    Get student's test attempts
+// @desc    Get student's test attempts with evaluated scores
 // @route   GET /api/attempts/my-attempts
 // @access  Student
 const getMyAttempts = async (req, res) => {
   try {
     const attempts = await TestAttempt.find({ studentId: req.user._id })
-      .populate('testId', 'title subject duration totalMarks isResultsReleased')
+      .populate('testId', 'title subject duration totalMarks isResultsReleased testType')
       .sort({ createdAt: -1 });
+
+    const Result = require('../models/Result');
+    const attemptIds = attempts.map((a) => a._id);
+    const results = await Result.find({ attemptId: { $in: attemptIds } });
+    
+    const resultsMap = {};
+    results.forEach((r) => {
+      resultsMap[r.attemptId.toString()] = {
+        totalMarksObtained: r.totalMarksObtained,
+        maxMarks: r.maxMarks,
+        percentage: r.percentage,
+        isPassed: r.isPassed,
+        isDisqualified: r.isDisqualified,
+        disqualificationReason: r.disqualificationReason,
+      };
+    });
+
+    const attemptsWithResults = attempts.map((att) => {
+      const attObj = att.toObject();
+      attObj.result = resultsMap[att._id.toString()] || null;
+      return attObj;
+    });
 
     return res.status(200).json({
       success: true,
-      attempts,
+      attempts: attemptsWithResults,
     });
   } catch (error) {
     return res.status(500).json({

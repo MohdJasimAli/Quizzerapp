@@ -44,7 +44,7 @@ export const TestBuilder = () => {
     negativeMarkValue: 1,
     randomizeQuestions: false,
     randomizeOptions: false,
-    releaseResultsMode: 'manual',
+    releaseResultsMode: 'immediate',
     warningLimit: 3,
     actionOnLimit: 'flag_for_review', // 'warn_only' | 'flag_for_review' | 'auto_submit'
     assignedTeacher: '',

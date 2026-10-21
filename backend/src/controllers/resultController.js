@@ -28,33 +28,11 @@ const getAttemptResult = async (req, res) => {
         return res.status(403).json({ success: false, message: 'Access denied.' });
       }
 
-      if (result.isDisqualified) {
-        return res.status(200).json({
-          success: true,
-          isReleased: true,
-          isDisqualified: true,
-          result: result.toStudentView(true),
-        });
-      }
-
-      const isReleased = test.isResultsReleased || test.releaseResultsMode === 'immediate' || result.isReleased;
-
-      if (!isReleased) {
-        return res.status(200).json({
-          success: true,
-          isReleased: false,
-          result: {
-            testTitle: test.title,
-            studentName: result.studentId.name,
-            rollNumber: result.studentId.rollNumber,
-            message: 'Your test has been successfully submitted! Results are currently under evaluation and will be published by the instructor.',
-          },
-        });
-      }
-
+      // Students can immediately see their score and detailed evaluation upon submission
       return res.status(200).json({
         success: true,
         isReleased: true,
+        isDisqualified: Boolean(result.isDisqualified),
         result: result.toStudentView(true),
       });
     }

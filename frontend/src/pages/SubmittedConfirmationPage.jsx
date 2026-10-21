@@ -92,26 +92,77 @@ export const SubmittedConfirmationPage = () => {
         </div>
 
         <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
-          Assessment Submitted!
+          Assessment Completed & Graded!
         </h1>
         <p className="text-sm text-slate-300 mt-2">
           Thank you for completing <strong className="text-white">{testTitle || 'the assessment'}</strong>.
         </p>
 
-        <div className="my-6 p-4 rounded-2xl bg-slate-900 border border-slate-800 text-xs text-slate-400 text-left space-y-2">
-          <div className="flex items-center gap-2 text-slate-200 font-semibold">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Submission Recorded Successfully</span>
+        {/* Immediate Scorecard Preview */}
+        {state.result ? (
+          <div className="my-6 p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                Instant Score Summary
+              </span>
+              <span
+                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                  state.result.isPassed
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                }`}
+              >
+                {state.result.isPassed ? 'PASSED' : 'FAILED'}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-3xl font-black text-indigo-400 font-mono">
+                  {state.result.totalMarksObtained}{' '}
+                  <span className="text-sm font-normal text-slate-500">
+                    / {state.result.maxMarks} Marks
+                  </span>
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Percentage:{' '}
+                  <strong className="text-emerald-400 font-mono">
+                    {state.result.percentage}%
+                  </strong>
+                </p>
+              </div>
+
+              <div className="text-right text-xs text-slate-400 space-y-1">
+                {state.result.mcqScore !== undefined && (
+                  <p>
+                    MCQ:{' '}
+                    <strong className="text-slate-200">
+                      {state.result.mcqScore} Marks
+                    </strong>
+                  </p>
+                )}
+                {state.result.codingScore !== undefined && (
+                  <p>
+                    Coding:{' '}
+                    <strong className="text-slate-200">
+                      {state.result.codingScore} Marks
+                    </strong>
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
-          <p>
-            All MCQ answers and coding files have been finalized on the server and queued for scoring.
-          </p>
-          {!isReleased && (
-            <p className="text-indigo-300">
-              Results are currently under review by the faculty and will be announced on your student dashboard once published.
+        ) : (
+          <div className="my-6 p-4 rounded-2xl bg-slate-900 border border-slate-800 text-xs text-slate-400 text-left space-y-2">
+            <div className="flex items-center gap-2 text-slate-200 font-semibold">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>Answers Checked & Recorded Successfully</span>
+            </div>
+            <p>
+              All MCQ answers and coding files have been evaluated on the server. Your scorecard is ready to view.
             </p>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="flex flex-col sm:flex-row items-center gap-3 justify-center">
           <Link
@@ -122,13 +173,13 @@ export const SubmittedConfirmationPage = () => {
             <span>Return to Dashboard</span>
           </Link>
 
-          {isReleased && state.result && (
+          {state.result && (
             <Link
               to={`/results/${state.result.attemptId || state.result._id}`}
               className="w-full sm:w-auto py-3 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center justify-center gap-2 transition shadow-lg shadow-indigo-600/30"
             >
               <Award className="w-4 h-4" />
-              <span>View Scorecard</span>
+              <span>View Full Scorecard & Breakdown</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           )}

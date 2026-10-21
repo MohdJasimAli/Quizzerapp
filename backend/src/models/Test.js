@@ -92,11 +92,11 @@ const testSchema = new mongoose.Schema(
     releaseResultsMode: {
       type: String,
       enum: ['immediate', 'manual'],
-      default: 'manual',
+      default: 'immediate',
     },
     isResultsReleased: {
       type: Boolean,
-      default: false,
+      default: true,
     },
     resultsReleasedAt: {
       type: Date,
