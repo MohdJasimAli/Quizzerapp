@@ -53,8 +53,11 @@ export const CameraRetinaProctor = ({
   const violationTriggeredRef = useRef(false);
   const currentGazeRef = useRef('CENTER');
   const simOverrideRef = useRef(null);
+  const cameraWarmupUntilRef = useRef(Date.now() + 4000); // 4-second camera warmup before violations can trigger
 
-  const GRACE_PERIOD_MS = 3500; // 3.5 seconds grace period before zero-tolerance kickout
+  const GRACE_PERIOD_MS = 3800; // 3.8 seconds sustained gaze deviation before zero-tolerance kickout
+
+  const isMountedRef = useRef(true);
 
   // 1. Initialize Webcam Stream
   const startCamera = useCallback(async () => {
@@ -79,6 +82,7 @@ export const CameraRetinaProctor = ({
         videoRef.current.onloadedmetadata = () => {
           videoRef.current.play().then(() => {
             setCameraReady(true);
+            cameraWarmupUntilRef.current = Date.now() + 3500;
           }).catch((err) => {
             console.error('Video play error:', err);
           });
@@ -87,9 +91,10 @@ export const CameraRetinaProctor = ({
 
       // Handle stream end or disconnection
       stream.getVideoTracks()[0].onended = () => {
+        if (!isMountedRef.current) return; // Clean unmount, not a violation
         setCameraReady(false);
         setCameraError('Webcam stream was disconnected or disabled.');
-        if (onViolation && !violationTriggeredRef.current) {
+        if (onViolation && !violationTriggeredRef.current && Date.now() > cameraWarmupUntilRef.current) {
           violationTriggeredRef.current = true;
           onViolation('camera_disconnected', 'Webcam was disconnected or stopped during assessment');
         }
@@ -116,6 +121,7 @@ export const CameraRetinaProctor = ({
     }
 
     return () => {
+      isMountedRef.current = false;
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
       }
@@ -586,6 +592,11 @@ export const CameraRetinaProctor = ({
       deviationStartRef.current = null;
       setWarningCountdown(null);
       setGazeScore(100);
+      return;
+    }
+
+    // Do not trigger violations during initial camera auto-exposure warmup
+    if (Date.now() < cameraWarmupUntilRef.current) {
       return;
     }
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import {
   Play,
@@ -10,6 +10,8 @@ import {
   Check,
   ChevronDown,
   Loader2,
+  Code2,
+  FileCode,
 } from 'lucide-react';
 import { runCodeSample } from '../services/executionService';
 import { useToast } from '../context/ToastContext';
@@ -23,8 +25,8 @@ const LANGUAGE_CONFIGS = {
 
 export const CodeEditorPanel = ({
   question,
-  code,
-  language,
+  code = '',
+  language = 'python',
   onChangeCode,
   onChangeLanguage,
   onResetStarterCode,
@@ -34,8 +36,18 @@ export const CodeEditorPanel = ({
   const [activeTab, setActiveTab] = useState('testcases'); // 'testcases' | 'console'
   const [runResults, setRunResults] = useState(null);
   const [customInput, setCustomInput] = useState('');
+  const [useClassicTextarea, setUseClassicTextarea] = useState(false);
+  const textareaRef = useRef(null);
+  const editorRef = useRef(null);
 
   const allowedLanguages = question.codingData?.allowedLanguages || ['python', 'java', 'c', 'cpp'];
+
+  const handleEditorMount = (editor) => {
+    editorRef.current = editor;
+    try {
+      editor.focus();
+    } catch (e) {}
+  };
 
   const handleRunCode = async () => {
     setIsRunning(true);
@@ -62,8 +74,23 @@ export const CodeEditorPanel = ({
     }
   };
 
+  // Tab key indent handler for fallback textarea
+  const handleTextareaKeyDown = (e) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const { selectionStart, selectionEnd, value } = e.target;
+      const newValue = value.substring(0, selectionStart) + '    ' + value.substring(selectionEnd);
+      onChangeCode(newValue);
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.selectionStart = textareaRef.current.selectionEnd = selectionStart + 4;
+        }
+      }, 0);
+    }
+  };
+
   return (
-    <div className="flex flex-col h-full bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+    <div className="flex flex-col bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl select-text">
       {/* Top Bar: Language Picker, Reset, Run Code */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-slate-950 border-b border-slate-800">
         <div className="flex items-center gap-2">
@@ -82,6 +109,16 @@ export const CodeEditorPanel = ({
             </select>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
           </div>
+
+          {/* Toggle between Monaco Editor and Classic Textarea if needed */}
+          <button
+            type="button"
+            onClick={() => setUseClassicTextarea(!useClassicTextarea)}
+            className="text-[11px] text-slate-400 hover:text-indigo-400 px-2 py-1 rounded bg-slate-900 border border-slate-800 hover:border-slate-700 transition"
+            title="Switch editor mode"
+          >
+            {useClassicTextarea ? 'Switch to Monaco IDE' : 'Plain Text Mode'}
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -116,26 +153,45 @@ export const CodeEditorPanel = ({
         </div>
       </div>
 
-      {/* Monaco Editor Container */}
-      <div className="flex-1 min-h-[340px] relative">
-        <Editor
-          height="100%"
-          language={LANGUAGE_CONFIGS[language]?.monacoLang || 'python'}
-          value={code}
-          onChange={(val) => onChangeCode(val || '')}
-          theme="vs-dark"
-          options={{
-            fontSize: 13,
-            fontFamily: '"Fira Code", Consolas, monospace',
-            minimap: { enabled: false },
-            scrollBeyondLastLine: false,
-            automaticLayout: true,
-            tabSize: 4,
-            wordWrap: 'on',
-            lineNumbers: 'on',
-            padding: { top: 12, bottom: 12 },
-          }}
-        />
+      {/* Editor Writing Area */}
+      <div className="relative min-h-[380px] h-[400px] w-full bg-[#1e1e1e] select-text">
+        {useClassicTextarea ? (
+          <textarea
+            ref={textareaRef}
+            value={code}
+            onChange={(e) => onChangeCode(e.target.value)}
+            onKeyDown={handleTextareaKeyDown}
+            placeholder="Type your code solution here..."
+            spellCheck={false}
+            className="w-full h-full p-4 bg-slate-950 font-mono text-xs sm:text-sm text-slate-100 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500 leading-relaxed border-none"
+          />
+        ) : (
+          <Editor
+            height="400px"
+            language={LANGUAGE_CONFIGS[language]?.monacoLang || 'python'}
+            value={code}
+            onChange={(val) => onChangeCode(val || '')}
+            onMount={handleEditorMount}
+            theme="vs-dark"
+            options={{
+              readOnly: false,
+              domReadOnly: false,
+              fontSize: 13,
+              fontFamily: '"Fira Code", Consolas, "Courier New", monospace',
+              minimap: { enabled: false },
+              scrollBeyondLastLine: false,
+              automaticLayout: true,
+              tabSize: 4,
+              wordWrap: 'on',
+              lineNumbers: 'on',
+              padding: { top: 12, bottom: 12 },
+              cursorBlinking: 'blink',
+              cursorStyle: 'line',
+              selectOnLineNumbers: true,
+              accessibilitySupport: 'off',
+            }}
+          />
+        )}
       </div>
 
       {/* Bottom Output Console */}
@@ -175,104 +231,102 @@ export const CodeEditorPanel = ({
               }`}
             >
               <Terminal className="w-3.5 h-3.5" />
-              <span>Console Output</span>
+              <span>Output Console</span>
             </button>
           </div>
+
+          {runResults && (
+            <div className="flex items-center gap-3 text-[11px] text-slate-400 font-mono">
+              <span className="flex items-center gap-1">
+                <Clock className="w-3 h-3 text-slate-500" />
+                <span>{runResults.executionTime}ms</span>
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Tab Content */}
-        <div className="p-3.5 overflow-y-auto text-xs font-mono">
+        {/* Console Tab Content */}
+        <div className="p-4 overflow-y-auto max-h-48 font-mono text-xs select-text">
           {activeTab === 'testcases' && (
-            <div>
-              {!runResults ? (
-                <div className="text-slate-500 text-center py-4 font-sans">
-                  Click <strong className="text-indigo-400">"Run Code"</strong> to test your solution against the sample test cases.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {runResults.results.map((res, i) => (
-                    <div
-                      key={i}
-                      className={`p-3 rounded-xl border ${
-                        res.passed
-                          ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200'
-                          : 'bg-rose-950/20 border-rose-500/30 text-rose-200'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-2 font-sans font-semibold">
-                        <span className="flex items-center gap-1.5">
-                          {res.passed ? (
-                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                          ) : (
-                            <XCircle className="w-4 h-4 text-rose-400" />
-                          )}
-                          <span>Sample Case #{res.testCaseIndex}</span>
-                        </span>
-                        <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400">
-                          {res.executionTime !== undefined && (
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" /> {res.executionTime}s
-                            </span>
-                          )}
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                              res.passed
-                                ? 'bg-emerald-500/20 text-emerald-300'
-                                : 'bg-rose-500/20 text-rose-300'
-                            }`}
-                          >
-                            {res.status || (res.passed ? 'Passed' : 'Failed')}
-                          </span>
-                        </div>
-                      </div>
-
-                      {res.input !== undefined && (
-                        <div className="mb-1.5">
-                          <span className="text-[10px] text-slate-400 font-sans uppercase font-bold">Input:</span>
-                          <pre className="bg-slate-950/80 p-2 rounded-lg mt-0.5 text-slate-300 whitespace-pre-wrap">
-                            {res.input || '(empty)'}
-                          </pre>
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {res.expectedOutput !== undefined && (
-                          <div>
-                            <span className="text-[10px] text-slate-400 font-sans uppercase font-bold">Expected Output:</span>
-                            <pre className="bg-slate-950/80 p-2 rounded-lg mt-0.5 text-slate-300 whitespace-pre-wrap">
-                              {res.expectedOutput}
-                            </pre>
-                          </div>
-                        )}
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-sans uppercase font-bold">Your Output:</span>
-                          <pre className="bg-slate-950/80 p-2 rounded-lg mt-0.5 text-slate-300 whitespace-pre-wrap">
-                            {res.actualOutput || '(no output)'}
-                          </pre>
-                        </div>
-                      </div>
-
-                      {res.errorMessage && (
-                        <div className="mt-2 text-rose-400 bg-rose-950/40 p-2 rounded-lg">
-                          <span className="text-[10px] font-sans font-bold uppercase">Error Detail:</span>
-                          <pre className="whitespace-pre-wrap mt-0.5">{res.errorMessage}</pre>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+            <div className="space-y-3">
+              {(!runResults || !runResults.results) && (
+                <div className="py-4 text-center text-slate-500 text-xs">
+                  Click <strong>Run Code</strong> above to evaluate your code against the public sample test cases.
                 </div>
               )}
+
+              {runResults?.results?.map((res, idx) => (
+                <div
+                  key={idx}
+                  className={`p-3 rounded-xl border transition ${
+                    res.passed
+                      ? 'bg-emerald-950/20 border-emerald-500/30'
+                      : 'bg-rose-950/20 border-rose-500/30'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-slate-300 flex items-center gap-1.5">
+                      {res.passed ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      ) : (
+                        <XCircle className="w-4 h-4 text-rose-400" />
+                      )}
+                      <span>Test Case #{idx + 1}</span>
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
+                        res.passed ? 'bg-emerald-900/50 text-emerald-300' : 'bg-rose-900/50 text-rose-300'
+                      }`}
+                    >
+                      {res.passed ? 'Passed' : 'Failed'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                    <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800">
+                      <span className="text-[10px] uppercase font-bold text-slate-500 block">Input</span>
+                      <pre className="text-slate-300 mt-0.5 whitespace-pre-wrap">{res.input || '(empty)'}</pre>
+                    </div>
+
+                    <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800">
+                      <span className="text-[10px] uppercase font-bold text-slate-500 block">Expected Output</span>
+                      <pre className="text-emerald-400 mt-0.5 whitespace-pre-wrap">{res.expectedOutput}</pre>
+                    </div>
+
+                    {!res.passed && (
+                      <div className="sm:col-span-2 bg-rose-950/40 p-2 rounded-lg border border-rose-900/50">
+                        <span className="text-[10px] uppercase font-bold text-rose-400 block">Your Output</span>
+                        <pre className="text-rose-200 mt-0.5 whitespace-pre-wrap">
+                          {res.actualOutput || res.error || '(no output)'}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
           {activeTab === 'console' && (
             <div className="space-y-2">
-              <p className="text-slate-400 font-sans text-xs">Standard output & stderr from execution:</p>
-              <pre className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-slate-300 whitespace-pre-wrap min-h-[80px]">
-                {runResults
-                  ? runResults.results.map((r, i) => `--- Case #${i + 1} ---\n${r.actualOutput || '(none)'}\n${r.errorMessage ? `Error: ${r.errorMessage}\n` : ''}`).join('\n')
-                  : 'No execution output yet. Click "Run Code".'}
-              </pre>
+              {runResults?.compilationError ? (
+                <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300">
+                  <p className="font-bold mb-1">Compilation / Syntax Error:</p>
+                  <pre className="whitespace-pre-wrap">{runResults.compilationError}</pre>
+                </div>
+              ) : runResults?.results?.[0]?.error ? (
+                <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300">
+                  <p className="font-bold mb-1">Runtime Error:</p>
+                  <pre className="whitespace-pre-wrap">{runResults.results[0].error}</pre>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-slate-300">
+                  <p className="font-semibold text-slate-400 mb-1">Standard Output:</p>
+                  <pre className="whitespace-pre-wrap text-emerald-400">
+                    {runResults?.results?.[0]?.actualOutput || 'No output recorded.'}
+                  </pre>
+                </div>
+              )}
             </div>
           )}
         </div>

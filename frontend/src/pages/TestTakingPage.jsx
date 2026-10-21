@@ -15,6 +15,7 @@ import { MobileCodingNotice } from '../components/MobileCodingNotice';
 import { IntegrityWarningModal } from '../components/IntegrityWarningModal';
 import { CameraRetinaProctor } from '../components/CameraRetinaProctor';
 import { CameraPermissionModal } from '../components/CameraPermissionModal';
+import { FormattedQuestionText } from '../components/FormattedQuestionText';
 import {
   Code2,
   CheckCircle2,
@@ -57,8 +58,20 @@ export const TestTakingPage = () => {
   const [isAutoSubmitted, setIsAutoSubmitted] = useState(false);
 
   // Camera Access & Retina Eye-Gaze Tracking State
-  const [cameraVerified, setCameraVerified] = useState(false);
+  const [cameraVerified, setCameraVerified] = useState(() => {
+    return Boolean(location.state?.cameraAlreadyVerified);
+  });
   const [retinaStatus, setRetinaStatus] = useState({ gaze: 'CENTER', isViolation: false, faceCount: 1 });
+  const [isGracePeriodOver, setIsGracePeriodOver] = useState(false);
+
+  // Warmup grace period for page transitions and browser fullscreen initialization
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsGracePeriodOver(true);
+    }, 6000); // 6-second initial grace warmup prevents false blurs during entrance
+
+    return () => clearTimeout(timer);
+  }, []);
 
   // UI state
   const [mobilePaletteOpen, setMobilePaletteOpen] = useState(false);
@@ -167,17 +180,20 @@ export const TestTakingPage = () => {
 
     // Detect Tab Switch / Window Blur
     const handleVisibilityChange = () => {
+      if (!isGracePeriodOver) return;
       if (document.hidden) {
         triggerIntegrityViolation('tab_switch', 'Student switched browser tab or minimized window');
       }
     };
 
     const handleWindowBlur = () => {
+      if (!isGracePeriodOver) return;
       triggerIntegrityViolation('window_blur', 'Window lost active keyboard/mouse focus');
     };
 
     // Detect Fullscreen Exit
     const handleFullscreenChange = () => {
+      if (!isGracePeriodOver) return;
       const isFullscreen = Boolean(
         document.fullscreenElement ||
         document.webkitFullscreenElement ||
@@ -199,7 +215,7 @@ export const TestTakingPage = () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
     };
-  }, [attempt, loading, isAutoSubmitted, test, triggerIntegrityViolation]);
+  }, [attempt, loading, isAutoSubmitted, test, triggerIntegrityViolation, isGracePeriodOver]);
 
   // 3. Periodic Background Autosave (Every 25 seconds)
   useEffect(() => {
@@ -393,7 +409,7 @@ export const TestTakingPage = () => {
   const unansweredCount = questions.length - answeredCount;
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col select-none">
+    <div className="min-h-screen bg-slate-950 flex flex-col">
       {/* Top Focused Examination Bar */}
       <header className="sticky top-0 z-30 bg-slate-950 border-b border-slate-800 px-4 py-2.5">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
@@ -519,10 +535,10 @@ export const TestTakingPage = () => {
 
                 <div>
                   <h2 className="text-base sm:text-lg font-bold text-white">
-                    {activeQuestion.title}
+                    <FormattedQuestionText text={activeQuestion.title} />
                   </h2>
-                  <div className="text-xs sm:text-sm text-slate-300 mt-2 whitespace-pre-wrap leading-relaxed">
-                    {activeQuestion.description}
+                  <div className="text-xs sm:text-sm text-slate-300 mt-2">
+                    <FormattedQuestionText text={activeQuestion.description} />
                   </div>
                 </div>
               </div>
@@ -558,7 +574,7 @@ export const TestTakingPage = () => {
                             {isSelected && <div className="w-2 h-2 rounded-full bg-white"></div>}
                           </div>
                           <span className="text-xs sm:text-sm font-medium leading-relaxed">
-                            {opt.text}
+                            <FormattedQuestionText text={opt.text} />
                           </span>
                         </div>
                       );

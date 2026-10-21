@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getTestById } from '../services/testService';
 import { startTest } from '../services/attemptService';
 import { useToast } from '../context/ToastContext';
+import { CameraPermissionModal } from '../components/CameraPermissionModal';
 import {
   FileText,
   Clock,
@@ -14,6 +15,8 @@ import {
   ArrowLeft,
   Maximize2,
   Lock,
+  Camera,
+  Eye,
 } from 'lucide-react';
 
 export const InstructionsPage = () => {
@@ -25,6 +28,7 @@ export const InstructionsPage = () => {
   const [loading, setLoading] = useState(true);
   const [agreed, setAgreed] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [cameraModalOpen, setCameraModalOpen] = useState(false);
 
   useEffect(() => {
     getTestById(testId)
@@ -37,16 +41,13 @@ export const InstructionsPage = () => {
       .finally(() => setLoading(false));
   }, [testId]);
 
-  const handleStartExam = async () => {
-    if (!agreed) {
-      toast.warning('Please confirm the academic honesty agreement to proceed.');
-      return;
-    }
-
+  // Triggered AFTER user has opened webcam and verified retina tracking in modal
+  const handleProceedAfterCamera = async () => {
+    setCameraModalOpen(false);
     setIsStarting(true);
 
     try {
-      // 1. Request fullscreen mode if supported
+      // 1. Request fullscreen mode
       try {
         if (document.documentElement.requestFullscreen) {
           await document.documentElement.requestFullscreen();
@@ -54,19 +55,38 @@ export const InstructionsPage = () => {
           await document.documentElement.webkitRequestFullscreen();
         }
       } catch (fsErr) {
-        console.warn('Fullscreen request bypassed or blocked by user gesture:', fsErr);
+        console.warn('Fullscreen request bypassed:', fsErr);
       }
 
-      // 2. Call start attempt API
+      // 2. Call start attempt API on backend
       const res = await startTest(testId);
       if (res.success) {
         toast.success('Exam started! Best of luck.');
-        navigate(`/tests/${testId}/take`, { state: { attemptData: res } });
+        navigate(`/tests/${testId}/take`, {
+          state: {
+            attemptData: res,
+            cameraAlreadyVerified: true,
+          },
+        });
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Could not start exam session.');
     } finally {
       setIsStarting(false);
+    }
+  };
+
+  const handleStartExamClick = () => {
+    if (!agreed) {
+      toast.warning('Please confirm the academic honesty agreement to proceed.');
+      return;
+    }
+
+    // If test requires camera (default), prompt the webcam verification modal first
+    if (test?.integrityPolicy?.requireCamera !== false) {
+      setCameraModalOpen(true);
+    } else {
+      handleProceedAfterCamera();
     }
   };
 
@@ -166,21 +186,28 @@ export const InstructionsPage = () => {
             className="w-4 h-4 mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 bg-slate-950 border-slate-700 cursor-pointer"
           />
           <label htmlFor="agreement" className="text-xs text-slate-300 cursor-pointer leading-relaxed">
-            I confirm that I am taking this examination independently without unauthorized aids, external assistance, or collaborative communication. I understand that violations will be reviewed by the instructor.
+            I confirm that I am taking this examination independently. I will maintain active webcam streaming and retina gaze on the screen throughout the session.
           </label>
         </div>
 
-        {/* Start Button */}
+        {/* Step 1: Open Webcam & Start Button */}
         <button
-          onClick={handleStartExam}
+          onClick={handleStartExamClick}
           disabled={!agreed || isStarting}
           className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white font-bold text-sm shadow-xl shadow-indigo-600/30 flex items-center justify-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
         >
-          <Maximize2 className="w-4 h-4" />
-          <span>{isStarting ? 'Initiating Examination Session...' : 'Enter Fullscreen & Begin Test'}</span>
+          <Camera className="w-4 h-4" />
+          <span>{isStarting ? 'Initiating Examination Session...' : 'Open Web Cam & Verify Retina Tracking'}</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Pre-Exam Camera & Retina Calibration Modal */}
+      <CameraPermissionModal
+        isOpen={cameraModalOpen}
+        testTitle={test?.title}
+        onProceed={handleProceedAfterCamera}
+      />
     </div>
   );
 };

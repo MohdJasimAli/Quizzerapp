@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getTestById, publishTest } from '../services/testService';
 import { useToast } from '../context/ToastContext';
+import { FormattedQuestionText } from '../components/FormattedQuestionText';
 import {
   ArrowLeft,
   Clock,
@@ -134,8 +135,12 @@ export const TestPreview = () => {
             </div>
 
             <div>
-              <h4 className="text-base font-bold text-white">{q.title}</h4>
-              <p className="text-xs text-slate-300 mt-2 whitespace-pre-wrap leading-relaxed">{q.description}</p>
+              <h4 className="text-base font-bold text-white">
+                <FormattedQuestionText text={q.title} />
+              </h4>
+              <div className="text-xs text-slate-300 mt-2">
+                <FormattedQuestionText text={q.description} />
+              </div>
             </div>
 
             {/* MCQ Options Display */}
@@ -150,7 +155,7 @@ export const TestPreview = () => {
                         : 'bg-slate-900 border-slate-800 text-slate-300'
                     }`}
                   >
-                    <span>{opt.text}</span>
+                    <span><FormattedQuestionText text={opt.text} /></span>
                     {opt.isCorrect && (
                       <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">
                         Correct Answer
