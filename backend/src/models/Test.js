@@ -121,6 +121,14 @@ const testSchema = new mongoose.Schema(
         type: Boolean,
         default: true,
       },
+      requireCamera: {
+        type: Boolean,
+        default: true,
+      },
+      requireRetinaTracking: {
+        type: Boolean,
+        default: true,
+      },
     },
     totalMarks: {
       type: Number,

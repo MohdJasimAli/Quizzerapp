@@ -80,10 +80,14 @@ export const ActivityLogsPage = () => {
             className="bg-slate-900 border border-slate-700 rounded-xl py-1.5 px-3 text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
           >
             <option value="">All Event Types</option>
+            <option value="retina_gaze_violation">Retina Gaze Violation (Eyes Off-Screen)</option>
+            <option value="face_not_detected">Face Not Detected</option>
+            <option value="multiple_faces_detected">Multiple Faces Detected</option>
+            <option value="camera_disconnected">Camera Disconnected</option>
             <option value="tab_switch">Tab Switch</option>
             <option value="fullscreen_exit">Fullscreen Exit</option>
             <option value="window_blur">Window Blur</option>
-            <option value="auto_submitted_violation">Auto-Submitted (Violation Limit)</option>
+            <option value="auto_submitted_violation">Auto-Submitted (Disqualified / Limit)</option>
             <option value="test_started">Test Started</option>
             <option value="test_submitted">Test Submitted</option>
           </select>

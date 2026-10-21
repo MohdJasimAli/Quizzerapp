@@ -72,6 +72,8 @@ const createTest = async (req, res) => {
         actionOnLimit: 'flag_for_review',
         requireFullscreen: true,
         detectTabSwitch: true,
+        requireCamera: true,
+        requireRetinaTracking: true,
       },
       assignedTeacher: req.user.role === 'admin' ? (assignedTeacher || req.user._id) : req.user._id,
       createdBy: req.user._id,

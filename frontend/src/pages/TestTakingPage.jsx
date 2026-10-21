@@ -13,6 +13,8 @@ import { QuestionNavigator } from '../components/QuestionNavigator';
 import { CodeEditorPanel } from '../components/CodeEditorPanel';
 import { MobileCodingNotice } from '../components/MobileCodingNotice';
 import { IntegrityWarningModal } from '../components/IntegrityWarningModal';
+import { CameraRetinaProctor } from '../components/CameraRetinaProctor';
+import { CameraPermissionModal } from '../components/CameraPermissionModal';
 import {
   Code2,
   CheckCircle2,
@@ -27,6 +29,8 @@ import {
   X,
   Loader2,
   Bookmark,
+  Eye,
+  Camera,
 } from 'lucide-react';
 
 export const TestTakingPage = () => {
@@ -51,6 +55,10 @@ export const TestTakingPage = () => {
   const [lastViolationType, setLastViolationType] = useState('tab_switch');
   const [violationCount, setViolationCount] = useState(0);
   const [isAutoSubmitted, setIsAutoSubmitted] = useState(false);
+
+  // Camera Access & Retina Eye-Gaze Tracking State
+  const [cameraVerified, setCameraVerified] = useState(false);
+  const [retinaStatus, setRetinaStatus] = useState({ gaze: 'CENTER', isViolation: false, faceCount: 1 });
 
   // UI state
   const [mobilePaletteOpen, setMobilePaletteOpen] = useState(false);
@@ -414,6 +422,21 @@ export const TestTakingPage = () => {
                     </>
                   )}
                 </span>
+                {test?.integrityPolicy?.requireCamera !== false && (
+                  <>
+                    <span>&bull;</span>
+                    <span
+                      className={`inline-flex items-center gap-1 font-mono px-2 py-0.5 rounded text-[9px] font-bold uppercase transition ${
+                        retinaStatus.isViolation
+                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse'
+                          : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+                      }`}
+                    >
+                      <Eye className="w-3 h-3" />
+                      <span>{retinaStatus.isViolation ? 'Gaze Deviation' : 'Retina Locked'}</span>
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -718,6 +741,34 @@ export const TestTakingPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Pre-Exam Camera Access & Retina Calibration Modal */}
+      <CameraPermissionModal
+        isOpen={!loading && test?.integrityPolicy?.requireCamera !== false && !cameraVerified && !isAutoSubmitted}
+        testTitle={test?.title}
+        onProceed={() => {
+          setCameraVerified(true);
+          try {
+            if (document.documentElement.requestFullscreen) {
+              document.documentElement.requestFullscreen().catch(() => {});
+            }
+          } catch (e) {}
+        }}
+      />
+
+      {/* Real-Time Camera & Retina Proctor Widget */}
+      {cameraVerified && test?.integrityPolicy?.requireCamera !== false && (
+        <CameraRetinaProctor
+          isActive={!isAutoSubmitted && !isSubmitting}
+          onViolation={(eventType, details) => {
+            triggerIntegrityViolation(eventType, details);
+          }}
+          onStatusChange={(status) => {
+            setRetinaStatus(status);
+          }}
+          requireRetina={test?.integrityPolicy?.requireRetinaTracking !== false}
+        />
       )}
     </div>
   );

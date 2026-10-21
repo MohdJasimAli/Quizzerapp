@@ -119,9 +119,9 @@ export const InstructionsPage = () => {
           </div>
 
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-3">
-            <ShieldAlert className="w-4 h-4 text-amber-400 mx-auto mb-1" />
-            <p className="text-[10px] uppercase font-bold text-slate-400">Integrity</p>
-            <p className="text-sm font-bold text-white mt-0.5">Monitored</p>
+            <ShieldAlert className="w-4 h-4 text-rose-400 mx-auto mb-1" />
+            <p className="text-[10px] uppercase font-bold text-slate-400">Proctoring</p>
+            <p className="text-sm font-bold text-white mt-0.5">Camera & Retina</p>
           </div>
         </div>
 
@@ -143,13 +143,16 @@ export const InstructionsPage = () => {
             <span>Strict Zero Tolerance Integrity Policy & Automatic Kick-Out</span>
           </h3>
           <p className="leading-relaxed">
-            1. <strong>Immediate Kick-Out & 0 Marks:</strong> Any attempt to switch browser tabs, leave or minimize the exam window, or exit fullscreen will <strong>IMMEDIATELY terminate your examination session, disqualify you, and set your score to 0</strong>.
+            1. <strong>Mandatory Camera & Retina Eye-Gaze Tracking:</strong> Active webcam access is mandatory. Your retina and eye gaze are monitored in real time. Looking away from the screen for over 3 seconds, looking down at notes/phone, multiple people, or leaving the frame will <strong>IMMEDIATELY kick you out, disqualify you, and award 0 marks</strong>.
           </p>
           <p className="leading-relaxed">
-            2. <strong>Automatic Submission on Time End:</strong> When the duration countdown expires, the test automatically finalizes and submits your current responses.
+            2. <strong>Browser Focus & Fullscreen:</strong> Any attempt to switch browser tabs, leave or minimize the exam window, or exit fullscreen will also <strong>IMMEDIATELY terminate your examination session with 0 marks</strong>.
           </p>
           <p className="leading-relaxed">
-            3. <strong>Autosave:</strong> All answers and code entries are autosaved in real-time.
+            3. <strong>Automatic Submission on Time End:</strong> When the duration countdown expires, the test automatically finalizes and submits your current responses.
+          </p>
+          <p className="leading-relaxed">
+            4. <strong>Autosave:</strong> All answers and code entries are autosaved in real-time.
           </p>
         </div>
 

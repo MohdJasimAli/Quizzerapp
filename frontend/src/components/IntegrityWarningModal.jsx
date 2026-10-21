@@ -15,6 +15,11 @@ export const IntegrityWarningModal = ({
     tab_switch: 'Tab switch / focus loss detected. Leaving the examination page is recorded as an integrity violation.',
     fullscreen_exit: 'Fullscreen mode was exited. Fullscreen is mandatory during the assessment.',
     window_blur: 'Window lost active focus. Another application or browser window may have been accessed.',
+    retina_gaze_violation: 'Retina eye-gaze tracking detected you were looking away from the screen for over 3 seconds.',
+    face_not_detected: 'Your face was not detected in the camera feed for over 3 seconds.',
+    multiple_faces_detected: 'Multiple faces were detected in the examination camera view.',
+    camera_disconnected: 'Webcam feed was disconnected or turned off during the examination.',
+    camera_permission_denied: 'Camera permission was denied. Proctored examination requires active camera access.',
   };
 
   const message = eventMessages[eventType] || 'Integrity anomaly detected and recorded on the server.';

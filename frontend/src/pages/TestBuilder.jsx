@@ -47,6 +47,8 @@ export const TestBuilder = () => {
     releaseResultsMode: 'immediate',
     warningLimit: 3,
     actionOnLimit: 'flag_for_review', // 'warn_only' | 'flag_for_review' | 'auto_submit'
+    requireCamera: true,
+    requireRetinaTracking: true,
     assignedTeacher: '',
   });
 
@@ -80,6 +82,8 @@ export const TestBuilder = () => {
               releaseResultsMode: t.releaseResultsMode || 'manual',
               warningLimit: t.integrityPolicy?.warningLimit || 3,
               actionOnLimit: t.integrityPolicy?.actionOnLimit || 'flag_for_review',
+              requireCamera: t.integrityPolicy?.requireCamera !== undefined ? Boolean(t.integrityPolicy.requireCamera) : true,
+              requireRetinaTracking: t.integrityPolicy?.requireRetinaTracking !== undefined ? Boolean(t.integrityPolicy.requireRetinaTracking) : true,
               assignedTeacher: t.assignedTeacher?._id || '',
             });
           }
@@ -122,6 +126,8 @@ export const TestBuilder = () => {
           actionOnLimit: formData.actionOnLimit,
           requireFullscreen: true,
           detectTabSwitch: true,
+          requireCamera: Boolean(formData.requireCamera),
+          requireRetinaTracking: Boolean(formData.requireRetinaTracking),
         },
         assignedTeacher: formData.assignedTeacher || undefined,
       };
@@ -349,10 +355,38 @@ export const TestBuilder = () => {
             </div>
 
             <div className="p-3.5 rounded-xl bg-rose-950/20 border border-rose-500/30 text-xs text-rose-200">
-              <strong>Strict Zero Tolerance Policy Enforced:</strong> If a student commits any integrity violation (tab switch, window minimization, or exiting fullscreen), the test will immediately kick them out, disqualify the attempt, and record <strong>0 marks</strong>. When the duration timer expires, the test automatically submits.
+              <strong>Strict Zero Tolerance Policy Enforced:</strong> If a student commits any integrity violation (tab switch, window minimization, camera disconnection, or looking away from screen via retina eye tracking), the test will immediately kick them out, disqualify the attempt, and record <strong>0 marks</strong>. When the duration timer expires, the test automatically submits.
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900 border border-slate-800">
+                <input
+                  type="checkbox"
+                  id="requireCamera"
+                  name="requireCamera"
+                  checked={formData.requireCamera}
+                  onChange={handleChange}
+                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-slate-950 border-slate-700 cursor-pointer"
+                />
+                <label htmlFor="requireCamera" className="text-xs text-slate-300 cursor-pointer">
+                  Mandatory Webcam Access (Live proctoring feed)
+                </label>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900 border border-slate-800">
+                <input
+                  type="checkbox"
+                  id="requireRetinaTracking"
+                  name="requireRetinaTracking"
+                  checked={formData.requireRetinaTracking}
+                  onChange={handleChange}
+                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-slate-950 border-slate-700 cursor-pointer"
+                />
+                <label htmlFor="requireRetinaTracking" className="text-xs text-slate-300 cursor-pointer">
+                  Real-Time Retina & Eye-Gaze Tracking (Detect eyes off-screen)
+                </label>
+              </div>
+
               <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900 border border-slate-800">
                 <input
                   type="checkbox"

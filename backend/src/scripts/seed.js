@@ -126,6 +126,8 @@ const seedData = async () => {
         actionOnLimit: 'flag_for_review',
         requireFullscreen: true,
         detectTabSwitch: true,
+        requireCamera: true,
+        requireRetinaTracking: true,
       },
       targetGroups: ['All Students'],
     });
@@ -644,6 +646,8 @@ int main() {
         actionOnLimit: 'flag_for_review',
         requireFullscreen: true,
         detectTabSwitch: true,
+        requireCamera: true,
+        requireRetinaTracking: true,
       },
     });
 

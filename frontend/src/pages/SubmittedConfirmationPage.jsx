@@ -57,7 +57,7 @@ export const SubmittedConfirmationPage = () => {
               <span>Immediate Kick-Out Policy Enforced</span>
             </div>
             <p>
-              An unauthorized window blur, tab switch, or fullscreen exit was recorded by the proctoring engine.
+              An unauthorized window blur, tab switch, camera interruption, or retina eye-gaze deviation was recorded by the proctoring engine.
             </p>
             <p className="font-semibold text-rose-100">
               Reason: <span className="capitalize">{reason ? reason.replace(/_/g, ' ') : 'Leaving examination screen'}</span>
