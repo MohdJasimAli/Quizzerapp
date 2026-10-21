@@ -59,7 +59,10 @@ export const TestTakingPage = () => {
 
   // Camera Access & Retina Eye-Gaze Tracking State
   const [cameraVerified, setCameraVerified] = useState(() => {
-    return Boolean(location.state?.cameraAlreadyVerified);
+    return Boolean(
+      location.state?.cameraAlreadyVerified ||
+      sessionStorage.getItem(`camera_verified_${testId}`)
+    );
   });
   const [retinaStatus, setRetinaStatus] = useState({ gaze: 'CENTER', isViolation: false, faceCount: 1 });
   const [isGracePeriodOver, setIsGracePeriodOver] = useState(false);
@@ -764,6 +767,7 @@ export const TestTakingPage = () => {
         isOpen={!loading && test?.integrityPolicy?.requireCamera !== false && !cameraVerified && !isAutoSubmitted}
         testTitle={test?.title}
         onProceed={() => {
+          sessionStorage.setItem(`camera_verified_${testId}`, 'true');
           setCameraVerified(true);
           try {
             if (document.documentElement.requestFullscreen) {

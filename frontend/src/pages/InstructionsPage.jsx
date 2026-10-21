@@ -62,6 +62,7 @@ export const InstructionsPage = () => {
       const res = await startTest(testId);
       if (res.success) {
         toast.success('Exam started! Best of luck.');
+        sessionStorage.setItem(`camera_verified_${testId}`, 'true');
         navigate(`/tests/${testId}/take`, {
           state: {
             attemptData: res,

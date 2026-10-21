@@ -12,20 +12,17 @@ import {
   UserX,
   Users,
   Compass,
-  Volume2,
 } from 'lucide-react';
 
 /**
  * CameraRetinaProctor Component
  *
- * Implements high-precision detection for:
- * 1. Head Movement & Head Rotation (Turning head left, right, or tilting down at phone/desk)
- * 2. Eye & Retina Gaze Tracking (Diverting eyes left, right, or down away from screen)
- * 3. Face Presence & Multiple Faces
- * 4. Excessive Head Movement / Restlessness
- * 5. Zero-tolerance kick-out with 0 marks on sustained movement away from screen (2.5s)
- * 6. Visual HUD overlay with real-time head yaw gauge, eye crosshairs, and live status
- * 7. Simulation testing controls for instantaneous verification
+ * High-sensitivity proctoring engine for:
+ * 1. Head Rotation (Turning head Left / Right away from screen)
+ * 2. Head Pitch (Tilting down toward phone, desk, or lap)
+ * 3. Gaze Deviation (Darting eyes away from screen)
+ * 4. Face Absence & Multiple Faces
+ * 5. Immediate zero-tolerance kickout with 0 marks after 2.5s of sustained violation
  */
 export const CameraRetinaProctor = ({
   isActive = true,
@@ -37,43 +34,46 @@ export const CameraRetinaProctor = ({
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const animFrameRef = useRef(null);
-  const faceMeshRef = useRef(null);
   const isMountedRef = useRef(true);
 
   // Status & Tracking State
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState(null);
-  const [engineType, setEngineType] = useState('initializing'); // 'mediapipe' | 'canvas_cv'
+  const [isCalibrated, setIsCalibrated] = useState(false);
   const [gazeDirection, setGazeDirection] = useState('CENTER');
-  const [movementDetail, setMovementDetail] = useState('Head and eyes focused on exam screen');
+  const [movementDetail, setMovementDetail] = useState('Eyes and head focused on exam screen');
   const [gazeScore, setGazeScore] = useState(100);
-  const [faceCount, setFaceCount] = useState(1);
   const [warningCountdown, setWarningCountdown] = useState(null);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [showSimControls, setShowSimControls] = useState(false);
-  const [currentYawValue, setCurrentYawValue] = useState(0.5);
+  const [showSimControls, setShowSimControls] = useState(true);
 
-  // Baseline calibration refs
-  const baselineHeadXRef = useRef(null);
-  const baselineHeadYRef = useRef(null);
-  const baselineEyeYRef = useRef(null);
-  const calibrationFramesRef = useRef(0);
-  const prevEyeMidRef = useRef(null);
-  const motionHistoryRef = useRef([]);
+  // Live telemetry display
+  const [telemetry, setTelemetry] = useState({
+    yaw: 0,
+    pitch: 0,
+    diff: 0,
+    state: 'CENTER',
+  });
+
+  // Calibration and Tracking Refs
+  const baselineFaceRef = useRef(null); // { cx, cy, w, h, skew }
+  const baselineTemplateRef = useRef(null); // 40x40 normalized grayscale patch
+  const calibrationCountRef = useRef(0);
+  const prevFramePixelsRef = useRef(null);
 
   const deviationStartRef = useRef(null);
   const violationTriggeredRef = useRef(false);
-  const lastBeepTimeRef = useRef(0);
+  const currentGazeRef = useRef('CENTER');
   const simOverrideRef = useRef(null);
-  const cameraWarmupUntilRef = useRef(Date.now() + 3000);
+  const cameraWarmupUntilRef = useRef(Date.now() + 2000);
+  const lastBeepTimeRef = useRef(0);
 
-  // Sustained movement threshold before zero-tolerance disqualification
-  const GRACE_PERIOD_MS = 2500; // 2.5 seconds sustained movement away from screen
+  const GRACE_PERIOD_MS = 2500; // 2.5s sustained violation before instant kickout
 
-  // Audio warning tone helper (Web Audio API)
+  // Audio warning chime (Web Audio API)
   const playWarningBeep = useCallback(() => {
     const now = Date.now();
-    if (now - lastBeepTimeRef.current < 1500) return; // Debounce audio
+    if (now - lastBeepTimeRef.current < 1200) return;
     lastBeepTimeRef.current = now;
 
     try {
@@ -84,7 +84,7 @@ export const CameraRetinaProctor = ({
       const gain = ctx.createGain();
 
       osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(440, ctx.currentTime);
+      osc.frequency.setValueAtTime(520, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
 
       gain.gain.setValueAtTime(0.12, ctx.currentTime);
@@ -94,9 +94,7 @@ export const CameraRetinaProctor = ({
       gain.connect(ctx.destination);
       osc.start();
       osc.stop(ctx.currentTime + 0.18);
-    } catch (e) {
-      // AudioContext may be restricted by browser policy before first click
-    }
+    } catch (e) {}
   }, []);
 
   // 1. Initialize Webcam Stream
@@ -124,7 +122,10 @@ export const CameraRetinaProctor = ({
             .play()
             .then(() => {
               setCameraReady(true);
-              cameraWarmupUntilRef.current = Date.now() + 3000;
+              cameraWarmupUntilRef.current = Date.now() + 2000;
+              calibrationCountRef.current = 0;
+              baselineFaceRef.current = null;
+              baselineTemplateRef.current = null;
             })
             .catch((err) => {
               console.error('Video play error:', err);
@@ -132,7 +133,6 @@ export const CameraRetinaProctor = ({
         };
       }
 
-      // Handle stream end or disconnection
       stream.getVideoTracks()[0].onended = () => {
         if (!isMountedRef.current) return;
         setCameraReady(false);
@@ -172,251 +172,54 @@ export const CameraRetinaProctor = ({
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
       }
-      if (faceMeshRef.current) {
-        try {
-          faceMeshRef.current.close();
-        } catch (e) {}
-      }
     };
   }, [isActive, startCamera]);
 
-  // 2. Movement & Eye Tracking Loop
+  // 2. High-Sensitivity Visual Tracking Loop
   useEffect(() => {
     if (!cameraReady || !videoRef.current || !canvasRef.current) return;
 
     let isMounted = true;
-    let useMediaPipe = false;
 
-    const initTracker = async () => {
-      try {
-        // Attempt to load MediaPipe FaceMesh safely
-        const mpModule = await import('@mediapipe/face_mesh');
-        const FaceMeshConstructor =
-          mpModule.FaceMesh || mpModule.default?.FaceMesh || mpModule.default || window.FaceMesh;
+    // Offscreen 160x120 canvas for fast pixel processing
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = 160;
+    offCanvas.height = 120;
+    const offCtx = offCanvas.getContext('2d');
 
-        if (typeof FaceMeshConstructor === 'function') {
-          const faceMesh = new FaceMeshConstructor({
-            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
-          });
+    const processFrame = () => {
+      if (!isMounted) return;
 
-          faceMesh.setOptions({
-            maxNumFaces: 2,
-            refineLandmarks: true,
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5,
-          });
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
 
-          faceMesh.onResults((results) => {
-            if (!isMounted) return;
-            processFaceMeshResults(results);
-          });
-
-          faceMeshRef.current = faceMesh;
-          setEngineType('mediapipe');
-          useMediaPipe = true;
-        } else {
-          setEngineType('canvas_cv');
-        }
-      } catch (err) {
-        console.warn('Using native high-precision CV Tracker:', err);
-        setEngineType('canvas_cv');
-        useMediaPipe = false;
-      }
-
-      runTrackingLoop(useMediaPipe);
-    };
-
-    const runTrackingLoop = (hasMediaPipe) => {
-      const processFrame = async () => {
-        if (!isMounted || !videoRef.current || videoRef.current.readyState < 2) {
-          animFrameRef.current = requestAnimationFrame(processFrame);
-          return;
-        }
-
-        if (hasMediaPipe && faceMeshRef.current) {
-          try {
-            await faceMeshRef.current.send({ image: videoRef.current });
-          } catch (e) {
-            runCanvasCVTracker();
-          }
-        } else {
-          runCanvasCVTracker();
-        }
-
+      if (!video || !canvas || video.readyState < 2 || video.videoWidth === 0) {
         animFrameRef.current = requestAnimationFrame(processFrame);
-      };
-
-      animFrameRef.current = requestAnimationFrame(processFrame);
-    };
-
-    // 3A. Process MediaPipe FaceMesh Results (When Available)
-    const processFaceMeshResults = (results) => {
-      const canvas = canvasRef.current;
-      const video = videoRef.current;
-      if (!canvas || !video) return;
+        return;
+      }
 
       const ctx = canvas.getContext('2d');
       const w = canvas.width;
       const h = canvas.height;
-      ctx.clearRect(0, 0, w, h);
 
+      // Check tester simulation override
       if (simOverrideRef.current) {
         handleMovementState(
           simOverrideRef.current.state,
           simOverrideRef.current.detail,
           simOverrideRef.current.faceCount
         );
-        renderHUDOverlay(ctx, w, h, null, null, simOverrideRef.current.state, simOverrideRef.current.detail, 0.5);
+        renderHUDOverlay(ctx, w, h, null, simOverrideRef.current.state, simOverrideRef.current.detail, 0, 0, 0);
+        animFrameRef.current = requestAnimationFrame(processFrame);
         return;
       }
 
-      const numFaces = results.multiFaceLandmarks?.length || 0;
-
-      if (numFaces === 0) {
-        handleMovementState('FACE_ABSENT', 'Student face not detected in camera view', 0);
-        renderHUDOverlay(ctx, w, h, null, null, 'FACE_ABSENT', 'Face Absent', 0.5);
-        return;
-      }
-
-      if (numFaces > 1) {
-        handleMovementState('MULTIPLE_FACES', 'Multiple people detected in camera view', numFaces);
-        renderHUDOverlay(ctx, w, h, null, null, 'MULTIPLE_FACES', 'Multiple Faces', 0.5);
-        return;
-      }
-
-      const landmarks = results.multiFaceLandmarks[0];
-
-      // Eyes
-      const leftInner = landmarks[133];
-      const leftOuter = landmarks[33];
-      const leftTop = landmarks[159];
-      const leftBottom = landmarks[145];
-      const leftIris = landmarks[468] || {
-        x: (leftInner.x + leftOuter.x) / 2,
-        y: (leftTop.y + leftBottom.y) / 2,
-      };
-
-      const rightInner = landmarks[362];
-      const rightOuter = landmarks[263];
-      const rightTop = landmarks[386];
-      const rightBottom = landmarks[374];
-      const rightIris = landmarks[473] || {
-        x: (rightInner.x + rightOuter.x) / 2,
-        y: (rightTop.y + rightBottom.y) / 2,
-      };
-
-      // Head Features
-      const nose = landmarks[1];
-      const leftCheek = landmarks[234];
-      const rightCheek = landmarks[454];
-
-      if (calibrationFramesRef.current < 20) {
-        baselineHeadXRef.current = nose.x;
-        baselineHeadYRef.current = nose.y;
-        calibrationFramesRef.current += 1;
-      }
-
-      const baseHeadY = baselineHeadYRef.current ?? nose.y;
-
-      // 1. HEAD YAW (Turning Head Left / Right)
-      const faceWidth = Math.abs(rightCheek.x - leftCheek.x) || 0.01;
-      const headYaw = (nose.x - leftCheek.x) / faceWidth; // ~0.50 center
-      setCurrentYawValue(headYaw);
-
-      // 2. HEAD PITCH (Tilting Head Down)
-      const headPitchDelta = nose.y - baseHeadY;
-
-      // 3. EYE GAZE RATIOS
-      const leftEyeWidth = Math.abs(leftOuter.x - leftInner.x) || 0.01;
-      const leftRatioX = (leftIris.x - Math.min(leftInner.x, leftOuter.x)) / leftEyeWidth;
-
-      const rightEyeWidth = Math.abs(rightOuter.x - rightInner.x) || 0.01;
-      const rightRatioX = (rightIris.x - Math.min(rightInner.x, rightOuter.x)) / rightEyeWidth;
-
-      const avgIrisX = (leftRatioX + rightRatioX) / 2;
-      const eyeHeight = Math.abs(leftBottom.y - leftTop.y) || 0.01;
-      const ratioY = (leftIris.y - leftTop.y) / eyeHeight;
-
-      let detectedState = 'CENTER';
-      let detail = 'Head and eyes focused on exam screen';
-
-      // Sensitive check for head turn or eye movement
-      if (headYaw < 0.40) {
-        detectedState = 'HEAD_TURNED_LEFT';
-        detail = 'Head turned to the left side away from screen';
-      } else if (headYaw > 0.60) {
-        detectedState = 'HEAD_TURNED_RIGHT';
-        detail = 'Head turned to the right side away from screen';
-      } else if (headPitchDelta > 0.05 || ratioY > 0.65) {
-        detectedState = 'LOOKING_DOWN';
-        detail = 'Head tilted down / eyes looking down at desk or phone';
-      } else if (avgIrisX > 0.58) {
-        detectedState = 'EYES_LOOKING_LEFT';
-        detail = 'Eyes diverted to the left side';
-      } else if (avgIrisX < 0.42) {
-        detectedState = 'EYES_LOOKING_RIGHT';
-        detail = 'Eyes diverted to the right side';
-      }
-
-      handleMovementState(detectedState, detail, 1);
-
-      renderHUDOverlay(
-        ctx,
-        w,
-        h,
-        {
-          leftIris: { x: leftIris.x * w, y: leftIris.y * h },
-          rightIris: { x: rightIris.x * w, y: rightIris.y * h },
-          leftBox: {
-            x: Math.min(leftInner.x, leftOuter.x) * w - 6,
-            y: leftTop.y * h - 6,
-            w: leftEyeWidth * w + 12,
-            h: eyeHeight * h + 12,
-          },
-          rightBox: {
-            x: Math.min(rightInner.x, rightOuter.x) * w - 6,
-            y: rightTop.y * h - 6,
-            w: rightEyeWidth * w + 12,
-            h: eyeHeight * h + 12,
-          },
-        },
-        nose ? { x: nose.x * w, y: nose.y * h } : null,
-        detectedState,
-        detail,
-        headYaw
-      );
-    };
-
-    // 3B. High-Precision Native Canvas Computer Vision Engine
-    const runCanvasCVTracker = () => {
-      const canvas = canvasRef.current;
-      const video = videoRef.current;
-      if (!canvas || !video || video.videoWidth === 0) return;
-
-      const ctx = canvas.getContext('2d');
-      const w = canvas.width;
-      const h = canvas.height;
-
-      if (simOverrideRef.current) {
-        handleMovementState(
-          simOverrideRef.current.state,
-          simOverrideRef.current.detail,
-          simOverrideRef.current.faceCount
-        );
-        renderHUDOverlay(ctx, w, h, null, null, simOverrideRef.current.state, simOverrideRef.current.detail, 0.5);
-        return;
-      }
-
-      const offCanvas = document.createElement('canvas');
-      offCanvas.width = 160;
-      offCanvas.height = 120;
-      const offCtx = offCanvas.getContext('2d');
+      // Draw current video frame to offscreen canvas
       offCtx.drawImage(video, 0, 0, 160, 120);
-
       const imgData = offCtx.getImageData(0, 0, 160, 120);
       const data = imgData.data;
 
-      // 1. Skin & Face Region Segmentation
+      // Step A: Skin & Face Boundary Detection
       let skinPixels = 0;
       let minX = 160,
         maxX = 0,
@@ -425,21 +228,21 @@ export const CameraRetinaProctor = ({
       let skinXSum = 0,
         skinYSum = 0;
 
-      for (let y = 10; y < 115; y += 2) {
-        for (let x = 15; x < 145; x += 2) {
+      for (let y = 8; y < 112; y += 2) {
+        for (let x = 12; x < 148; x += 2) {
           const idx = (y * 160 + x) * 4;
           const r = data[idx];
           const g = data[idx + 1];
           const b = data[idx + 2];
 
-          // Robust illumination-invariant skin detector
+          // Broad, reliable illumination-adaptive skin model
           const isSkin =
-            r > 45 &&
-            g > 25 &&
-            b > 15 &&
+            r > 38 &&
+            g > 20 &&
+            b > 12 &&
             r > g &&
-            r - b > 10 &&
-            r - g > 6 &&
+            r - b > 8 &&
+            r - g > 4 &&
             Math.abs(r - g) < 140;
 
           if (isSkin) {
@@ -456,239 +259,211 @@ export const CameraRetinaProctor = ({
 
       ctx.clearRect(0, 0, w, h);
 
-      // Check Face Presence
       const faceW = maxX - minX;
       const faceH = maxY - minY;
 
-      if (skinPixels < 130 || faceW < 24 || faceH < 24) {
+      // Check Face Presence
+      if (skinPixels < 110 || faceW < 22 || faceH < 22) {
         handleMovementState('FACE_ABSENT', 'Student face not detected in camera view', 0);
-        renderHUDOverlay(ctx, w, h, null, null, 'FACE_ABSENT', 'Face Absent', 0.5);
+        renderHUDOverlay(ctx, w, h, null, 'FACE_ABSENT', 'Face Absent', 0, 0, 1);
+        animFrameRef.current = requestAnimationFrame(processFrame);
         return;
       }
 
-      const faceCenterX = skinXSum / skinPixels;
-      const faceCenterY = skinYSum / skinPixels;
+      const cx = skinXSum / skinPixels;
+      const cy = skinYSum / skinPixels;
       const boxCenterX = (minX + maxX) / 2;
 
-      // 2. Locate Eyes in Upper 22% - 48% of the Face
-      const eyeTopY = Math.round(minY + faceH * 0.2);
-      const eyeBottomY = Math.round(minY + faceH * 0.48);
-      const leftEyeStartX = Math.round(minX + faceW * 0.12);
-      const leftEyeEndX = Math.round(minX + faceW * 0.48);
-      const rightEyeStartX = Math.round(minX + faceW * 0.52);
-      const rightEyeEndX = Math.round(minX + faceW * 0.88);
+      // Extract 40x40 normalized grayscale face patch
+      const patchSize = 40;
+      const currentPatch = new Float32Array(patchSize * patchSize);
+      const patchStartX = Math.max(0, Math.min(160 - patchSize, Math.round(cx - patchSize / 2)));
+      const patchStartY = Math.max(0, Math.min(120 - patchSize, Math.round(cy - patchSize / 2)));
 
-      // Find Darkest Pupil Valley (3x3 kernel minimum luminance)
-      const findDarkestFeature = (startX, endX, startY, endY) => {
-        let minLum = 9999;
-        let bestX = Math.round((startX + endX) / 2);
-        let bestY = Math.round((startY + endY) / 2);
+      for (let py = 0; py < patchSize; py++) {
+        for (let px = 0; px < patchSize; px++) {
+          const srcIdx = ((patchStartY + py) * 160 + (patchStartX + px)) * 4;
+          // Luminance normalized [0, 1]
+          currentPatch[py * patchSize + px] =
+            (data[srcIdx] * 0.299 + data[srcIdx + 1] * 0.587 + data[srcIdx + 2] * 0.114) / 255;
+        }
+      }
 
-        for (let y = Math.max(0, startY); y < Math.min(120, endY); y += 2) {
-          for (let x = Math.max(0, startX); x < Math.min(160, endX); x += 2) {
-            let kernelLum = 0;
-            let sampleCount = 0;
+      // Step B: Auto-Calibration on first 25 frames
+      if (calibrationCountRef.current < 25) {
+        calibrationCountRef.current += 1;
+        if (calibrationCountRef.current === 25) {
+          baselineFaceRef.current = { cx, cy, w: faceW, h: faceH, boxCenterX };
+          baselineTemplateRef.current = new Float32Array(currentPatch);
+          setIsCalibrated(true);
+        } else {
+          // Calibration in progress
+          renderHUDOverlay(
+            ctx,
+            w,
+            h,
+            { cx: (cx / 160) * w, cy: (cy / 120) * h, w: (faceW / 160) * w, h: (faceH / 120) * h },
+            'CALIBRATING',
+            `Calibrating face position (${calibrationCountRef.current}/25)... Look straight`,
+            0,
+            0,
+            0
+          );
+          animFrameRef.current = requestAnimationFrame(processFrame);
+          return;
+        }
+      }
 
-            for (let ky = -1; ky <= 1; ky++) {
-              for (let kx = -1; kx <= 1; kx++) {
-                const py = y + ky;
-                const px = x + kx;
-                if (px >= 0 && px < 160 && py >= 0 && py < 120) {
-                  const idx = (py * 160 + px) * 4;
-                  kernelLum += data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114;
-                  sampleCount++;
-                }
-              }
-            }
+      const base = baselineFaceRef.current || { cx, cy, w: faceW, h: faceH, boxCenterX };
+      const refTemplate = baselineTemplateRef.current || currentPatch;
 
-            const avgLum = kernelLum / (sampleCount || 1);
-            if (avgLum < minLum) {
-              minLum = avgLum;
-              bestX = x;
-              bestY = y;
-            }
+      // Step C: High-Sensitivity Movement & Pose Detection
+
+      // 1. Template Difference (Face Rotation / Deformation)
+      let templateDiff = 0;
+      for (let i = 0; i < patchSize * patchSize; i++) {
+        templateDiff += Math.abs(currentPatch[i] - refTemplate[i]);
+      }
+      templateDiff /= patchSize * patchSize;
+
+      // 2. Head Yaw (Horizontal Shift & Perspective Skew)
+      // Note: Video is mirrored in CSS (scale-x-[-1]), so when user turns to THEIR left, cx shifts in camera
+      const deltaX = (cx - base.cx) / (base.w || 40);
+      const leftCheekWidth = cx - minX;
+      const rightCheekWidth = maxX - cx;
+      const skew = (leftCheekWidth - rightCheekWidth) / (faceW || 1);
+
+      // 3. Head Pitch (Looking Down at Phone/Desk)
+      const deltaY = (cy - base.cy) / (base.h || 40);
+
+      // 4. Feature Contrast Asymmetry
+      // Divide face into left and right halves and measure luminance balance
+      let leftLum = 0,
+        rightLum = 0,
+        leftCount = 0,
+        rightCount = 0;
+      for (let y = Math.round(minY + faceH * 0.2); y < Math.round(minY + faceH * 0.7); y += 2) {
+        for (let x = Math.round(minX); x < Math.round(maxX); x += 2) {
+          const idx = (y * 160 + x) * 4;
+          const lum = data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114;
+          if (x < cx) {
+            leftLum += lum;
+            leftCount++;
+          } else {
+            rightLum += lum;
+            rightCount++;
           }
         }
-        return { x: bestX, y: bestY };
-      };
-
-      const leftPupil = findDarkestFeature(leftEyeStartX, leftEyeEndX, eyeTopY, eyeBottomY);
-      const rightPupil = findDarkestFeature(rightEyeStartX, rightEyeEndX, eyeTopY, eyeBottomY);
-
-      // Calibrate Baseline Eye Level during initial 20 frames
-      const eyeMidY = (leftPupil.y + rightPupil.y) / 2;
-      const eyeMidX = (leftPupil.x + rightPupil.x) / 2;
-
-      if (calibrationFramesRef.current < 20) {
-        baselineHeadXRef.current = faceCenterX;
-        baselineHeadYRef.current = faceCenterY;
-        baselineEyeYRef.current = eyeMidY;
-        calibrationFramesRef.current += 1;
       }
+      const avgLeftLum = leftLum / (leftCount || 1);
+      const avgRightLum = rightLum / (rightCount || 1);
+      const lumAsymmetry = Math.abs(avgLeftLum - avgRightLum) / (avgLeftLum + avgRightLum || 1);
 
-      const baseEyeY = baselineEyeYRef.current ?? eyeMidY;
-
-      // 3. HEAD YAW (Turning Head Left / Right via Margin Symmetry)
-      const distLeft = leftPupil.x - minX;
-      const distRight = maxX - rightPupil.x;
-      const marginSum = distLeft + distRight || 1;
-      const headYaw = distLeft / marginSum; // ~0.50 at center
-      setCurrentYawValue(headYaw);
-
-      // Eye Midpoint Offset from Bounding Box Center
-      const eyeOffsetFromBoxCenter = (eyeMidX - boxCenterX) / faceW;
-
-      // 4. HEAD PITCH (Tilting Head Down / Desk)
-      const eyeDeltaFromBaseline = (eyeMidY - baseEyeY) / faceH;
-      const eyeRatioFromTop = (eyeMidY - minY) / faceH;
-
-      // 5. EYE / RETINA GAZE RATIO (Inside Eye Sockets)
-      const leftEyeW = leftEyeEndX - leftEyeStartX || 1;
-      const pupilRatioL = (leftPupil.x - leftEyeStartX) / leftEyeW;
-
-      const rightEyeW = rightEyeEndX - rightEyeStartX || 1;
-      const pupilRatioR = (rightPupil.x - rightEyeStartX) / rightEyeW;
-      const avgPupilRatio = (pupilRatioL + pupilRatioR) / 2;
-
-      // 6. FRAME-TO-FRAME HEAD MOVEMENT VELOCITY
-      let headVelocity = 0;
-      if (prevEyeMidRef.current) {
-        headVelocity = Math.hypot(
-          eyeMidX - prevEyeMidRef.current.x,
-          eyeMidY - prevEyeMidRef.current.y
-        );
-      }
-      prevEyeMidRef.current = { x: eyeMidX, y: eyeMidY };
-
-      motionHistoryRef.current.push(headVelocity);
-      if (motionHistoryRef.current.length > 10) {
-        motionHistoryRef.current.shift();
-      }
-      const avgMotion =
-        motionHistoryRef.current.reduce((a, b) => a + b, 0) /
-        (motionHistoryRef.current.length || 1);
-
-      // Sensitive Classification of Movement
+      // Sensitive State Classification
       let detectedState = 'CENTER';
       let detail = 'Head and eyes focused on exam screen';
 
-      if (headYaw < 0.38 || eyeOffsetFromBoxCenter < -0.07) {
+      // 1. Turn Head Left
+      if (deltaX < -0.045 || skew < -0.10 || (deltaX < -0.025 && templateDiff > 0.07)) {
         detectedState = 'HEAD_TURNED_LEFT';
         detail = 'Head turned to the left side away from screen';
-      } else if (headYaw > 0.62 || eyeOffsetFromBoxCenter > 0.07) {
+      }
+      // 2. Turn Head Right
+      else if (deltaX > 0.045 || skew > 0.10 || (deltaX > 0.025 && templateDiff > 0.07)) {
         detectedState = 'HEAD_TURNED_RIGHT';
         detail = 'Head turned to the right side away from screen';
-      } else if (eyeRatioFromTop > 0.48 || eyeDeltaFromBaseline > 0.07) {
+      }
+      // 3. Look Down (at phone, keyboard, desk, notes)
+      else if (deltaY > 0.04 || (deltaY > 0.025 && templateDiff > 0.07)) {
         detectedState = 'LOOKING_DOWN';
         detail = 'Head tilted down / eyes looking down at phone or notes';
-      } else if (avgPupilRatio < 0.37) {
-        detectedState = 'EYES_LOOKING_LEFT';
-        detail = 'Eyes / retina gaze diverted to the left';
-      } else if (avgPupilRatio > 0.63) {
-        detectedState = 'EYES_LOOKING_RIGHT';
-        detail = 'Eyes / retina gaze diverted to the right';
-      } else if (avgMotion > 5.2) {
-        detectedState = 'HEAD_MOVEMENT_EXCESSIVE';
-        detail = 'Excessive head movement / constant looking around';
       }
+      // 4. Look Away / Extreme Angle
+      else if (templateDiff > 0.12) {
+        detectedState = 'LOOKING_AWAY';
+        detail = 'Head or gaze diverted away from examination screen';
+      }
+
+      setTelemetry({
+        yaw: Number(deltaX.toFixed(3)),
+        pitch: Number(deltaY.toFixed(3)),
+        diff: Number(templateDiff.toFixed(3)),
+        state: detectedState,
+      });
 
       handleMovementState(detectedState, detail, 1);
 
-      // Scale to Canvas Coordinates
-      const scaleX = w / 160;
-      const scaleY = h / 120;
-
+      // Render HUD with face tracking box and directional pointers
       renderHUDOverlay(
         ctx,
         w,
         h,
         {
-          leftIris: { x: leftPupil.x * scaleX, y: leftPupil.y * scaleY },
-          rightIris: { x: rightPupil.x * scaleX, y: rightPupil.y * scaleY },
-          leftBox: {
-            x: leftEyeStartX * scaleX,
-            y: eyeTopY * scaleY,
-            w: leftEyeW * scaleX,
-            h: (eyeBottomY - eyeTopY) * scaleY,
-          },
-          rightBox: {
-            x: rightEyeStartX * scaleX,
-            y: eyeTopY * scaleY,
-            w: rightEyeW * scaleX,
-            h: (eyeBottomY - eyeTopY) * scaleY,
-          },
+          cx: (cx / 160) * w,
+          cy: (cy / 120) * h,
+          w: (faceW / 160) * w,
+          h: (faceH / 120) * h,
         },
-        { x: faceCenterX * scaleX, y: faceCenterY * scaleY },
         detectedState,
         detail,
-        headYaw
+        deltaX,
+        deltaY,
+        templateDiff
       );
+
+      animFrameRef.current = requestAnimationFrame(processFrame);
     };
 
-    // 4. Render High-Tech Proctor HUD Overlay
-    const renderHUDOverlay = (ctx, w, h, eyeData, centerPoint, state, detail, yaw = 0.5) => {
+    // 3. Render High-Tech HUD Overlay
+    const renderHUDOverlay = (ctx, w, h, faceBox, state, detail, deltaX, deltaY, diff) => {
       ctx.save();
 
-      const isNormal = state === 'CENTER';
-      const themeColor = isNormal ? '#10b981' : '#ef4444';
+      const isNormal = state === 'CENTER' || state === 'CALIBRATING';
+      const themeColor = state === 'CALIBRATING' ? '#38bdf8' : isNormal ? '#10b981' : '#ef4444';
 
-      if (eyeData) {
-        // Eye Bounding Boxes
-        [eyeData.leftBox, eyeData.rightBox].forEach((box) => {
-          if (!box) return;
-          ctx.strokeStyle = themeColor;
-          ctx.lineWidth = 1.5;
-          ctx.setLineDash([4, 3]);
-          ctx.strokeRect(box.x, box.y, box.w, box.h);
-          ctx.setLineDash([]);
-        });
+      if (faceBox) {
+        // Facial Tracking Target Box
+        const bx = faceBox.cx - faceBox.w / 2;
+        const by = faceBox.cy - faceBox.h / 2;
 
-        // Retina & Pupil Crosshairs
-        [eyeData.leftIris, eyeData.rightIris].forEach((iris) => {
-          if (!iris) return;
+        ctx.strokeStyle = themeColor;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(bx, by, faceBox.w, faceBox.h);
+
+        // Target Crosshair at Face Center
+        ctx.beginPath();
+        ctx.arc(faceBox.cx, faceBox.cy, 4, 0, Math.PI * 2);
+        ctx.fillStyle = themeColor;
+        ctx.fill();
+
+        ctx.strokeStyle = themeColor;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(faceBox.cx - 12, faceBox.cy);
+        ctx.lineTo(faceBox.cx + 12, faceBox.cy);
+        ctx.moveTo(faceBox.cx, faceBox.cy - 12);
+        ctx.lineTo(faceBox.cx, faceBox.cy + 12);
+        ctx.stroke();
+
+        // Directional Gaze/Head Vector
+        if (!isNormal) {
+          let vecX = faceBox.cx;
+          let vecY = faceBox.cy;
+
+          if (state.includes('LEFT')) vecX -= 45;
+          else if (state.includes('RIGHT')) vecX += 45;
+          else if (state.includes('DOWN')) vecY += 35;
+
           ctx.beginPath();
-          ctx.arc(iris.x, iris.y, 7, 0, Math.PI * 2);
-          ctx.strokeStyle = themeColor;
-          ctx.lineWidth = 1.5;
+          ctx.moveTo(faceBox.cx, faceBox.cy);
+          ctx.lineTo(vecX, vecY);
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 3;
           ctx.stroke();
 
           ctx.beginPath();
-          ctx.arc(iris.x, iris.y, 2.5, 0, Math.PI * 2);
-          ctx.fillStyle = themeColor;
-          ctx.fill();
-
-          ctx.strokeStyle = themeColor;
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(iris.x - 9, iris.y);
-          ctx.lineTo(iris.x + 9, iris.y);
-          ctx.moveTo(iris.x, iris.y - 9);
-          ctx.lineTo(iris.x, iris.y + 9);
-          ctx.stroke();
-        });
-
-        // Gaze Vector Pointer
-        if (eyeData.leftIris && eyeData.rightIris) {
-          const midX = (eyeData.leftIris.x + eyeData.rightIris.x) / 2;
-          const midY = (eyeData.leftIris.y + eyeData.rightIris.y) / 2;
-
-          let targetX = midX;
-          let targetY = midY;
-
-          if (state.includes('LEFT')) targetX += 45;
-          else if (state.includes('RIGHT')) targetX -= 45;
-          else if (state.includes('DOWN')) targetY += 35;
-
-          ctx.beginPath();
-          ctx.moveTo(midX, midY);
-          ctx.lineTo(targetX, targetY);
-          ctx.strokeStyle = themeColor;
-          ctx.lineWidth = 2.5;
-          ctx.stroke();
-
-          ctx.beginPath();
-          ctx.arc(targetX, targetY, 3.5, 0, Math.PI * 2);
-          ctx.fillStyle = themeColor;
+          ctx.arc(vecX, vecY, 4, 0, Math.PI * 2);
+          ctx.fillStyle = '#ef4444';
           ctx.fill();
         }
       }
@@ -707,28 +482,31 @@ export const CameraRetinaProctor = ({
       const bannerText =
         state === 'CENTER'
           ? '● RETINA LOCKED: EYES ON SCREEN'
+          : state === 'CALIBRATING'
+          ? '◌ CALIBRATING RETINA SENSOR...'
           : `⚠️ ALERT: ${state.replace(/_/g, ' ')}`;
 
       ctx.fillText(bannerText, 12, 23);
 
-      // Bottom Head Yaw Gauge Bar
-      const gaugeW = 100;
+      // Bottom Head Yaw / Deviation Bar
+      const gaugeW = 110;
       const gaugeH = 6;
       const gaugeX = (w - gaugeW) / 2;
       const gaugeY = h - 14;
 
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
-      ctx.fillRect(gaugeX - 10, gaugeY - 4, gaugeW + 20, gaugeH + 8);
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+      ctx.fillRect(gaugeX - 8, gaugeY - 4, gaugeW + 16, gaugeH + 8);
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
       ctx.strokeRect(gaugeX, gaugeY, gaugeW, gaugeH);
 
-      // Center mark
-      ctx.fillStyle = '#64748b';
+      // Center calibration tick
+      ctx.fillStyle = '#94a3b8';
       ctx.fillRect(gaugeX + gaugeW / 2 - 1, gaugeY - 2, 2, gaugeH + 4);
 
-      // Yaw position indicator
-      const clampedYaw = Math.max(0.1, Math.min(0.9, yaw));
-      const markerX = gaugeX + clampedYaw * gaugeW;
+      // Marker for current yaw
+      const normalizedYaw = Math.max(-0.2, Math.min(0.2, deltaX));
+      const markerX = gaugeX + gaugeW / 2 + (normalizedYaw / 0.2) * (gaugeW / 2);
+
       ctx.fillStyle = isNormal ? '#10b981' : '#ef4444';
       ctx.beginPath();
       ctx.arc(markerX, gaugeY + gaugeH / 2, 4, 0, Math.PI * 2);
@@ -737,7 +515,7 @@ export const CameraRetinaProctor = ({
       ctx.restore();
     };
 
-    initTracker();
+    animFrameRef.current = requestAnimationFrame(processFrame);
 
     return () => {
       isMounted = false;
@@ -747,15 +525,14 @@ export const CameraRetinaProctor = ({
     };
   }, [cameraReady]);
 
-  // 5. Zero-Tolerance Violation Trigger
+  // 4. Zero-Tolerance Violation Action Trigger
   const handleMovementState = useCallback(
     (state, detail, count) => {
       setGazeDirection(state);
       setMovementDetail(detail);
-      setFaceCount(count);
       currentGazeRef.current = state;
 
-      const isViolation = state !== 'CENTER';
+      const isViolation = state !== 'CENTER' && state !== 'CALIBRATING';
 
       if (onStatusChange) {
         onStatusChange({
@@ -778,7 +555,7 @@ export const CameraRetinaProctor = ({
         return;
       }
 
-      // Movement detected -> Play audio warning tone
+      // Movement detected -> Play audio warning chime
       playWarningBeep();
 
       const now = Date.now();
@@ -798,9 +575,11 @@ export const CameraRetinaProctor = ({
         violationTriggeredRef.current = true;
 
         let eventType = 'retina_gaze_violation';
-        let fullDetails = `Proctoring violation: ${detail} for over 2.5 seconds`;
+        let fullDetails = `Proctoring violation: ${detail} sustained for over 2.5 seconds`;
 
-        if (state.startsWith('HEAD_TURNED') || state === 'HEAD_MOVEMENT_EXCESSIVE') {
+        if (state.startsWith('HEAD_TURNED') || state === 'LOOKING_AWAY') {
+          eventType = 'head_movement_violation';
+        } else if (state === 'LOOKING_DOWN') {
           eventType = 'head_movement_violation';
         } else if (state === 'FACE_ABSENT') {
           eventType = 'face_not_detected';
@@ -840,6 +619,8 @@ export const CameraRetinaProctor = ({
                 className={`w-2.5 h-2.5 rounded-full block ${
                   gazeDirection === 'CENTER'
                     ? 'bg-emerald-500 animate-pulse'
+                    : gazeDirection === 'CALIBRATING'
+                    ? 'bg-sky-400 animate-pulse'
                     : 'bg-rose-500 animate-ping'
                 }`}
               ></span>
@@ -905,7 +686,7 @@ export const CameraRetinaProctor = ({
                   className="absolute inset-0 w-full h-full object-cover pointer-events-none"
                 />
 
-                {/* Sustained Violation Warning Alarm */}
+                {/* Sustained Violation Warning Alarm Overlay */}
                 {warningCountdown !== null && (
                   <div className="absolute inset-0 bg-rose-600/40 border-4 border-rose-500 flex flex-col items-center justify-center p-3 text-center animate-pulse z-10">
                     <ShieldAlert className="w-10 h-10 text-white mb-1 drop-shadow-md animate-bounce" />
@@ -939,6 +720,8 @@ export const CameraRetinaProctor = ({
               className={`font-bold font-mono px-2 py-0.5 rounded text-[10px] uppercase ${
                 gazeDirection === 'CENTER'
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  : gazeDirection === 'CALIBRATING'
+                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
                   : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
               }`}
             >
@@ -965,9 +748,10 @@ export const CameraRetinaProctor = ({
             </div>
           </div>
 
-          <p className="text-[10px] text-slate-400 truncate">
-            Status: <span className="text-slate-200">{movementDetail}</span>
-          </p>
+          <div className="flex items-center justify-between text-[9px] font-mono text-slate-400 pt-0.5">
+            <span>Sens: Yaw {telemetry.yaw} | Pitch {telemetry.pitch}</span>
+            <span>Diff: {telemetry.diff}</span>
+          </div>
 
           {/* Tester Simulation Controls */}
           {showSimControls && (

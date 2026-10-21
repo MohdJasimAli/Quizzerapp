@@ -39,19 +39,21 @@ const startTest = async (req, res) => {
       });
     }
 
-    // Check if student was previously disqualified from this test
-    const disqualifiedAttempt = await TestAttempt.findOne({
-      testId,
-      studentId,
-      status: 'disqualified',
-    });
-
-    if (disqualifiedAttempt) {
-      return res.status(403).json({
-        success: false,
-        isDisqualified: true,
-        message: 'You have been disqualified from this assessment due to an integrity violation. Your marks are 0 and you cannot re-attempt.',
+    // If test only allows 1 attempt, a disqualification prevents re-attempting
+    if (test.maxAttempts === 1) {
+      const disqualifiedAttempt = await TestAttempt.findOne({
+        testId,
+        studentId,
+        status: 'disqualified',
       });
+
+      if (disqualifiedAttempt) {
+        return res.status(403).json({
+          success: false,
+          isDisqualified: true,
+          message: 'You have been disqualified from this assessment due to an integrity violation. Your marks are 0 and you cannot re-attempt.',
+        });
+      }
     }
 
     // Check existing attempt
