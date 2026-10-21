@@ -48,14 +48,19 @@
 
 ---
 
-### 3. Practical Anti-Cheating & Integrity Monitoring
-- **Fullscreen Enforcement**: Requests browser fullscreen upon entering the test.
-- **Tab & Window Blur Monitoring**: Detects `document.hidden` and window blur events.
-- **Configurable Integrity Policies**:
-  - Warning counter with deterrence modal (e.g. 3 warnings allowed).
-  - Configurable actions on limit: `warn_only`, `flag_for_review`, or `auto_submit`.
-  - Timestamped centralized logging in `ActivityLog`.
-- **Honest Deterrence**: Clear and transparent communication regarding browser-based deterrence capabilities without overreaching privacy intrusions.
+### 3. Practical Anti-Cheating & Retina Eye-Gaze Proctoring
+- **Webcam Access & Pre-Exam Calibration Gate**: Mandatory camera check on the instructions page before examination start.
+- **Real-Time Retina & Eye-Gaze Tracking**:
+  - Dual-engine architecture: MediaPipe 478-landmark FaceMesh with sub-pixel iris/retina tracking, paired with an offline HTML5 Canvas Computer Vision pupil detector.
+  - Cybernetic live HUD overlay with iris crosshairs, eye bounding boxes, and dynamic gaze vector trajectory.
+  - Real-time deviation classification: `CENTER`, `LOOKING_LEFT`, `LOOKING_RIGHT`, `LOOKING_DOWN`, `FACE_ABSENT`, `MULTIPLE_FACES`.
+- **Zero-Tolerance Kick-Out**: Any sustained gaze deviation (>3.8s), tab switch, window minimization, or camera disconnect immediately kicks the student out, disqualifies the session, and sets marks to 0.
+- **Fullscreen & Tab Monitoring**: Detects `document.hidden`, window blur, and fullscreen changes with a 6-second initial entrance grace buffer.
+- **Instant Answer Evaluation**: All MCQ and Coding submissions are automatically evaluated on the server upon submission, presenting an instant graded scorecard to the student.
+- **Student Self-Registration & Faculty Credential Sharing**:
+  - Public `/register` portal exclusively for students.
+  - Admin dashboard creates faculty accounts with 1-click WhatsApp/Email formatted credential sharing and on-demand credential reset cards.
+- **Interactive Live Demo Test**: Pre-configured test (`🚀 KAIROS LIVE DEMO TEST`) with 99 attempts, 5 questions, 40 marks, and active proctoring for hands-on evaluation.
 
 ---
 
