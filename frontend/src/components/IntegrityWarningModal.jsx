@@ -34,32 +34,46 @@ export const IntegrityWarningModal = ({
         </div>
 
         <h3 className="text-xl font-bold text-white mb-1">
-          {autoSubmitted ? 'Assessment Auto-Submitted' : 'Test Integrity Warning'}
+          {violationCount === 2 ? '⚠️ FINAL INTEGRITY WARNING' : '⚠️ Test Integrity Warning'}
         </h3>
 
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-950/80 border border-rose-500/50 text-rose-300 text-xs font-semibold my-2">
-          <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold my-2 ${
+          violationCount === 2
+            ? 'bg-rose-950 text-rose-300 border border-rose-500 animate-pulse'
+            : 'bg-amber-950 text-amber-300 border border-amber-500'
+        }`}>
+          <ShieldAlert className="w-3.5 h-3.5" />
           <span>
-            Violation {violationCount} of {warningLimit}
+            {violationCount === 2 ? 'FINAL WARNING (2 of 2)' : 'Warning 1 of 2'}
           </span>
         </div>
 
-        <p className="text-sm text-slate-300 mt-2 leading-relaxed">
+        <p className="text-sm text-slate-200 mt-2 leading-relaxed">
           {message}
         </p>
 
-        {autoSubmitted ? (
-          <div className="mt-4 p-3 rounded-xl bg-rose-950/40 border border-rose-900 text-xs text-rose-200">
-            You have reached the maximum allowed integrity violations. Your test has been finalized and automatically submitted for teacher review.
+        <div className="mt-4 p-3 rounded-xl bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300 text-left w-full space-y-1.5">
+          <p className="font-semibold text-white">Strict Eye & Proctoring Rules:</p>
+          <p className="flex items-center gap-1.5 text-slate-300">
+            <span>&bull;</span>
+            <span>You must look <strong>directly in front</strong> at the screen throughout the assessment.</span>
+          </p>
+          <p className="flex items-center gap-1.5 text-slate-300">
+            <span>&bull;</span>
+            <span>Looking away, turning your head, or looking down at a phone/desk is strictly recorded.</span>
+          </p>
+          <div className="mt-2 pt-2 border-t border-slate-700 font-bold text-xs">
+            {violationCount === 2 ? (
+              <span className="text-rose-400 animate-pulse">
+                🚨 ONE MORE VIOLATION WILL IMMEDIATELY DISQUALIFY YOU WITH 0 MARKS!
+              </span>
+            ) : (
+              <span className="text-amber-400">
+                1 Warning Remaining before immediate test termination with 0 marks.
+              </span>
+            )}
           </div>
-        ) : (
-          <div className="mt-4 p-3 rounded-xl bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300 text-left w-full space-y-1">
-            <p className="font-semibold text-slate-200">Important Reminders:</p>
-            <p>&bull; Remain in full-screen mode at all times.</p>
-            <p>&bull; Do not use external tabs, developer tools, or background windows.</p>
-            <p>&bull; Warnings remaining before review action: <strong className="text-rose-400">{warningsLeft}</strong></p>
-          </div>
-        )}
+        </div>
 
         <button
           onClick={onAcknowledge}

@@ -376,46 +376,86 @@ const logIntegrityEvent = async (req, res) => {
 
     attempt.violationCount += 1;
 
-    // IMMEDIATE DISQUALIFICATION POLICY:
-    // Any violation kicks student out of test immediately and sets marks to 0
-    attempt.status = 'disqualified';
-    attempt.isDisqualified = true;
-    attempt.disqualificationReason = details || `Integrity violation: ${eventType.replace(/_/g, ' ')}`;
-    attempt.submittedAt = new Date();
-    attempt.submissionReason = 'disqualification';
-    attempt.submittedBySystem = true;
-    attempt.isFlaggedForReview = true;
+    // INTEGRITY POLICY:
+    // Give 2 warnings. On the 3rd violation, end the test immediately and award 0 marks.
+    const MAX_VIOLATIONS = 3;
 
-    await attempt.save();
+    if (attempt.violationCount >= MAX_VIOLATIONS) {
+      // 3rd Violation -> Immediate Disqualification with 0 marks
+      attempt.status = 'disqualified';
+      attempt.isDisqualified = true;
+      attempt.disqualificationReason = details || `Integrity violation limit reached (3/3): ${eventType.replace(/_/g, ' ')}`;
+      attempt.submittedAt = new Date();
+      attempt.submissionReason = 'disqualification';
+      attempt.submittedBySystem = true;
+      attempt.isFlaggedForReview = true;
 
-    // Save to centralized ActivityLog as Critical
-    await ActivityLog.create({
-      testId: test._id,
-      studentId: req.user._id,
-      attemptId: attempt._id,
-      eventType: 'auto_submitted_violation',
-      severity: 'critical',
-      details: {
+      await attempt.save();
+
+      // Log Critical Activity
+      await ActivityLog.create({
+        testId: test._id,
+        studentId: req.user._id,
+        attemptId: attempt._id,
+        eventType: 'auto_submitted_violation',
+        severity: 'critical',
+        details: {
+          violationCount: attempt.violationCount,
+          disqualification: true,
+          reason: attempt.disqualificationReason,
+        },
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.headers['user-agent'],
+      });
+
+      // Evaluate attempt with 0 marks across all questions
+      const result = await evaluateAttempt(attempt._id);
+
+      return res.status(200).json({
+        success: true,
+        disqualified: true,
+        autoSubmitted: true,
         violationCount: attempt.violationCount,
-        disqualification: true,
+        maxViolations: MAX_VIOLATIONS,
+        message: '3rd integrity violation recorded: You have been disqualified from this test and your marks have been set to 0.',
         reason: attempt.disqualificationReason,
-      },
-      ipAddress: req.ip || req.connection.remoteAddress,
-      userAgent: req.headers['user-agent'],
-    });
+        result: result.toStudentView ? result.toStudentView(true) : null,
+      });
+    } else {
+      // 1st or 2nd Violation -> Issue Warning without disqualification
+      await attempt.save();
 
-    // Evaluate attempt - sets 0 marks across all questions!
-    const result = await evaluateAttempt(attempt._id);
+      await ActivityLog.create({
+        testId: test._id,
+        studentId: req.user._id,
+        attemptId: attempt._id,
+        eventType,
+        severity: attempt.violationCount === 2 ? 'high' : 'medium',
+        details: {
+          violationCount: attempt.violationCount,
+          warningNumber: attempt.violationCount,
+          reason: details,
+        },
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.headers['user-agent'],
+      });
 
-    return res.status(200).json({
-      success: true,
-      disqualified: true,
-      autoSubmitted: true,
-      violationCount: attempt.violationCount,
-      message: 'Violation detected: You have been immediately disqualified from this test and your marks have been set to 0.',
-      reason: attempt.disqualificationReason,
-      result: result.toStudentView ? result.toStudentView(true) : null,
-    });
+      const warningsLeft = MAX_VIOLATIONS - attempt.violationCount;
+      const warningMessage =
+        attempt.violationCount === 1
+          ? 'Warning 1/2: Please look directly in front at the screen! One more warning remaining before immediate disqualification with 0 marks.'
+          : 'FINAL WARNING 2/2: You are not looking in front! Next violation will immediately end your test with 0 marks!';
+
+      return res.status(200).json({
+        success: true,
+        disqualified: false,
+        autoSubmitted: false,
+        violationCount: attempt.violationCount,
+        maxViolations: MAX_VIOLATIONS,
+        warningsLeft,
+        message: warningMessage,
+      });
+    }
   } catch (error) {
     return res.status(500).json({
       success: false,

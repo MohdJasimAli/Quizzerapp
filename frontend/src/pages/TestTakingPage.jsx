@@ -454,6 +454,19 @@ export const TestTakingPage = () => {
                       <Eye className="w-3 h-3" />
                       <span>{retinaStatus.isViolation ? 'Gaze Deviation' : 'Retina Locked'}</span>
                     </span>
+                    <span>&bull;</span>
+                    <span
+                      className={`inline-flex items-center gap-1 font-mono px-2 py-0.5 rounded text-[9px] font-bold uppercase transition ${
+                        violationCount === 0
+                          ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+                          : violationCount === 1
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          : 'bg-rose-500/20 text-rose-300 border border-rose-500/50 animate-pulse'
+                      }`}
+                    >
+                      <ShieldAlert className="w-3 h-3" />
+                      <span>Warnings: {violationCount}/2</span>
+                    </span>
                   </>
                 )}
               </div>
@@ -788,6 +801,7 @@ export const TestTakingPage = () => {
             setRetinaStatus(status);
           }}
           requireRetina={test?.integrityPolicy?.requireRetinaTracking !== false}
+          currentViolationCount={violationCount}
         />
       )}
     </div>
